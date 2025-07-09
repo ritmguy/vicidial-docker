@@ -1,6 +1,6 @@
-INSERT INTO servers(server_id,server_description,server_ip,active,asterisk_version)
-SELECT 'dialer1','Test install of Asterisk server', '10.10.10.15','Y','18.0.21'
-WHERE NOT EXISTS (SELECT 1 FROM servers);
+INSERT IGNORE INTO servers(server_id, server_description, server_ip, active, asterisk_version)
+SELECT 'dialer1', 'Test install of Asterisk server', '10.10.10.15', 'Y', '18.0.21'
+WHERE NOT EXISTS (SELECT 1 FROM servers WHERE server_ip = '10.10.10.15');
 
 INSERT INTO server_updater SET server_ip='10.10.10.15', last_update=now();
 

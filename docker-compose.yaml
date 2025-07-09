@@ -7,11 +7,11 @@ services:
       dockerfile: 'Dockerfile.mysql8'
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mysql", "--user=$$MYSQL_USER", "--password=$$MYSQL_PASSWORD", "--execute", "SELECT 1;"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-S", "/tmp/mysql.sock"]
       interval: 10s
       timeout: 5s
       retries: 2
-      start_period: 30s
+      start_period: 20s
     ports:
       - 127.0.0.1:3306:3306
     env_file:
@@ -36,9 +36,9 @@ services:
     restart: unless-stopped
     environment:
       - VICI_DB_HOST=10.10.10.10
-    # depends_on:
-    #   db:
-    #     condition: 'service_healthy'
+    depends_on:
+      db:
+        condition: 'service_healthy'
     
 
     ports:
