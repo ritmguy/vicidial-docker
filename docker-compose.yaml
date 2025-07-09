@@ -1,0 +1,69 @@
+services:
+
+  db:
+    container_name: vicidial-db
+    build:
+      context: './docker/mysql'
+      dockerfile: 'Dockerfile.mysql8'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysql", "--user=$$MYSQL_USER", "--password=$$MYSQL_PASSWORD", "--execute", "SELECT 1;"]
+      interval: 10s
+      timeout: 5s
+      retries: 2
+      start_period: 30s
+    ports:
+      - 127.0.0.1:3306:3306
+    env_file:
+      - './docker/mysql/mysql.env'
+    networks:
+      backend:
+        ipv4_address: 10.10.10.10
+    volumes:
+      - db_data:/var/lib/mysql
+      - db_log:/var/log/mysql
+      - ./docker/mysql/import:/var/lib/mysql_csvs
+      
+  app:
+
+    container_name: vicidial-dialer
+    build:
+      context: './docker/app'
+      args:
+        - VICI_DB=10.10.10.10
+      dockerfile: 'Dockerfile.ubuntu'
+
+    restart: unless-stopped
+    environment:
+      - VICI_DB_HOST=10.10.10.10
+    # depends_on:
+    #   db:
+    #     condition: 'service_healthy'
+    
+
+    ports:
+      - "127.0.0.1:8080:80" # HTTP
+      - "127.0.0.1:5060:5060/udp" # SIP
+    networks:
+      backend:
+        ipv4_address: 10.10.10.15
+
+    # comment the following line in production, it allows to have nice human-readable logs in dev
+    tty: true
+
+
+networks:
+  backend:
+    name: vici-net
+    driver: bridge
+    # Set internal subnet
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.10.0/24
+  
+ 
+# Volumes needed for mariadb persistency
+volumes:
+  db_data:
+  db_log:
