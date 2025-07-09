@@ -31,11 +31,10 @@ services:
       context: './docker/app'
       args:
         - VICI_DB=10.10.10.10
+        - VICI_HOST=10.10.10.15
       dockerfile: 'Dockerfile.ubuntu'
 
     restart: unless-stopped
-    environment:
-      - VICI_DB_HOST=10.10.10.10
     depends_on:
       db:
         condition: 'service_healthy'

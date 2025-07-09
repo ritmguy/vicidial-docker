@@ -2,6 +2,7 @@
 FROM ubuntu:22.04 AS final
 
 ARG VICI_DB
+ARG VICI_HOST
 ENV DEBIAN_FRONTEND=noninteractive
 
 ## Set time on server - UTC, America/New_York, etc...
@@ -148,6 +149,7 @@ RUN mkdir -p /usr/src/astguiclient && \
     ## Install script - change opts as needed
     cd trunk/ && perl install.pl \
         --no-prompt \
+        --server_ip=${VICI_HOST} \
         --web=/var/www/html \
         --DB_server=${VICI_DB} \
         --active_keepalives=1234568 \
