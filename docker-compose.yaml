@@ -13,12 +13,14 @@ services:
       retries: 2
       start_period: 20s
     ports:
-      - 127.0.0.1:3306:3306
+      - "127.0.0.1:3306:3306"
     env_file:
       - './docker/mysql/mysql.env'
     networks:
       backend:
         ipv4_address: 10.10.10.10
+
+    # network_mode: host
     volumes:
       - db_data:/var/lib/mysql
       - db_log:/var/log/mysql
@@ -38,18 +40,39 @@ services:
     depends_on:
       db:
         condition: 'service_healthy'
+      # certbot:
+      #   condition: 'service_completed_successfully'
     
+    volumes:
+      - /var/www/html
+      - ./docker/certbot/letsencrypt/certs:/etc/letsencrypt
+      - ./docker/certbot/letsencrypt/data:/var/lib/letsencrypt
 
-    ports:
-      - "127.0.0.1:8080:80" # HTTP
-      - "127.0.0.1:5060:5060/udp" # SIP
     networks:
       backend:
         ipv4_address: 10.10.10.15
 
-    # comment the following line in production, it allows to have nice human-readable logs in dev
-    tty: true
+    ports:
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:5060:5060"
+      - "127.0.0.1:10000-50000:10000-50000"
 
+    # use to bind host to all ports
+    # network_mode: host
+
+    # comment the following line in production, it allows to have nice human-readable logs in dev
+    # tty: true
+
+  # certbot:
+  #   image: certbot/certbot
+  #   volumes_from:
+  #     - app
+
+  #   # set the domain & email for certbot here
+  #   command: certonly --keep-until-expiring --standalone --email test@test.com --agree-tos --no-eff-email -d vici-dev.protect247.app
+
+  #   # set proper network_mode to bind port 80 and get certificate before webserver starts
+  #   network_mode: host
 
 networks:
   backend:
@@ -60,7 +83,6 @@ networks:
       driver: default
       config:
         - subnet: 10.10.10.0/24
-  
  
 # Volumes needed for mariadb persistency
 volumes:
