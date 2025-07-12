@@ -3,7 +3,7 @@ use asterisk;
 
 /* -----  Vicidial Phone Codes ----- */
 
-LOAD DATA INFILE '/var/lib/mysql_csvs/vici_phone_codes_2025-07-08.csv'
+LOAD DATA INFILE '/var/lib/mysql-files/vici_phone_codes_2025-07-08.csv'
 INTO TABLE `vicidial_phone_codes`
 FIELDS TERMINATED BY ','
 ENCLOSED BY '\''
@@ -12,7 +12,7 @@ IGNORE 1 ROWS;
 
 /* -----  Vicidial Postal Codes ----- */
 
-LOAD DATA INFILE '/var/lib/mysql_csvs/vici_postal_codes_2025-07-08.csv'
+LOAD DATA INFILE '/var/lib/mysql-files/vici_postal_codes_2025-07-08.csv'
 INTO TABLE `vicidial_postal_codes`
 FIELDS TERMINATED BY ','
 ENCLOSED BY '\''

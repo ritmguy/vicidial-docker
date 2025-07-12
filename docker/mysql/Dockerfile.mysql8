@@ -1,8 +1,8 @@
 FROM mysql:8.0.42
 
 # Create /var/mysql_csvs folders to import large CSV files to container
-RUN mkdir /var/lib/mysql_csvs
-COPY --chmod=777 import/*.csv /var/lib/mysql_csvs/
+# RUN mkdir /var/lib/mysql_csvs
+# COPY --chmod=777 import/*.csv /var/lib/mysql_csvs/
 
 # Copy docker/mysql/init-scripts files to mysql initdb mount. SQL files will be executed on startup
 COPY --chmod=777 scripts/*.sql /docker-entrypoint-initdb.d/

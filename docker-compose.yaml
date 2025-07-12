@@ -24,7 +24,7 @@ services:
     volumes:
       - db_data:/var/lib/mysql
       - db_log:/var/log/mysql
-      - ./docker/mysql/import:/var/lib/mysql_csvs
+      - ./docker/mysql/import:/var/lib/mysql-files
       
   app:
 
@@ -55,7 +55,7 @@ services:
     ports:
       - "127.0.0.1:8080:80"
       - "127.0.0.1:5060:5060"
-      - "127.0.0.1:10000-50000:10000-50000"
+      # - "127.0.0.1:10000-50000:10000-50000"
 
     # use to bind host to all ports
     # network_mode: host

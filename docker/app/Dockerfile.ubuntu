@@ -162,6 +162,6 @@ COPY --chmod=0644 crontab /etc/cron.d/vici_cron
 COPY supervisord.conf /etc/supervisor/conf.d/
 COPY start_asterisk_boot.pl /usr/share/astguiclient/
 
-EXPOSE 80 5060 10000-60000
+EXPOSE 80 5060 10000-20000
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
