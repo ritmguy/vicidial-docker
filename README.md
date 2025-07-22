@@ -4,7 +4,7 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
 
 ---
 
-## ![headset](https://img.icons8.com/lollipop/48/headset.png) Services
+## ![headset](https://img.icons8.com/lollipop/48/headset.png) Vicidial Services
 
 ### `db` - MariaDB Database
 - **Container Name:** `vicidial-db`
@@ -20,7 +20,7 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
 
 ---
 
-### `dialer` - Vicidial Application
+### `dialer` - Vicidial Application (web server & dialer)
 - **Container Name:** `vicidial-dialer`
 - **Dockerfile:** `./docker/app/Dockerfile.ubuntu`
 - **Build Args:**
