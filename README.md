@@ -52,3 +52,50 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
   certonly --keep-until-expiring --standalone \
     --email test@test.com --agree-tos \
     --no-eff-email -d vici-dev.protect247.app
+
+## 🌐 Networks
+
+- **vici-backend**  
+  Bridge network  
+  Internal (no outbound internet access)  
+  Subnet: `10.10.10.0/24`
+
+- **vici-frontend**  
+  Bridge network for web/public interfaces
+
+## 💾 Volumes
+
+- `db_data` — Persistent MariaDB data  
+- `db_log` — MariaDB logs
+
+## 🚀 Usage
+
+1. Clone the repository  
+2. Ensure your environment files are correctly populated (e.g., `./docker/mysql/mysql.env`)  
+3. Build and start the services:  
+   ```bash
+   docker compose up -d --build
+
+## 📁 Directory Structure (Expected)
+
+.
+├── docker
+│   ├── app
+│   │   └── Dockerfile.ubuntu
+│   ├── mysql
+│   │   ├── Dockerfile.mariadb
+│   │   ├── mysql.env
+│   │   └── import/
+│   └── certbot
+│       └── letsencrypt/
+│           ├── certs/
+│           └── data/
+└── docker-compose.yml
+🛠 Troubleshooting
+
+Stuck containers: Try docker compose down -v && docker compose up --build
+Database socket errors: Ensure /tmp/mysql.sock is correctly referenced in config and healthcheck
+SIP/RTP issues: Open required ports or use host networking if needed
+## 📜 License
+
+This project is provided as-is, under the terms of the MIT License.
