@@ -4,7 +4,7 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
 
 ---
 
-## <i class="fas fa-headset"></i> Services
+## ![headset](https://img.icons8.com/ios-filled/50/000000/headset.png) Services
 
 ### `db` - MariaDB Database
 - **Container Name:** `vicidial-db`
