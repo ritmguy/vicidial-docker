@@ -1,0 +1,11 @@
+FROM mariadb:10.11.13-jammy
+
+
+# Copy docker/mysql/init-scripts files to mysql initdb mount. SQL files will be executed on startup
+COPY --chmod=777 scripts/*.sql /docker-entrypoint-initdb.d/
+
+# Copy custom conf file
+COPY my.cnf.mariadb /etc/mysql/conf.d/my.cnf
+RUN sed -i 's|socket *= */run/mysqld/mysqld.sock|socket = /tmp/mysql.sock|g' /etc/mysql/my.cnf
+
+EXPOSE 3306
