@@ -12,13 +12,15 @@ services:
       timeout: 5s
       retries: 2
       start_period: 20s
-    # ports:
-    #   - "127.0.0.1:3306:3306"
+
     env_file:
       - './docker/mysql/mysql.env'
     networks:
       backend:
         ipv4_address: 10.10.10.10
+
+    # ports:
+    #   - "127.0.0.1:3306:3306"
 
     # network_mode: host
     volumes:
