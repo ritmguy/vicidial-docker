@@ -131,8 +131,9 @@ RUN make menuselect/menuselect menuselect-tree menuselect.makeopts && \
     menuselect/menuselect --enable app_meetme menuselect.makeopts && \
     menuselect/menuselect --enable res_http_websocket menuselect.makeopts && \
     menuselect/menuselect --enable res_srtp menuselect.makeopts && \
-    # sed -i 's|noload = chan_sip.so|;noload = chan_sip.so|g' /etc/asterisk/modules.conf && \
-    make all && make install && make samples && make basic-pbx
+    make -j$(nproc) && \
+    make all && make install && \
+    sed -i 's|noload = chan_sip.so|;noload = chan_sip.so|g' /etc/asterisk/modules.conf
 
 ## Post-Asterisk installs
 RUN apt-get update -y \
@@ -163,6 +164,11 @@ COPY supervisord.conf /etc/supervisor/conf.d/
 COPY start_asterisk_boot.pl /usr/share/astguiclient/
 COPY --chmod=0644 ./apache2/html/* /var/www/html/
 COPY --chmod=0666 ./asterisk-conf/* /etc/asterisk/
+
+## For running SSL - certbot container must get certs prior
+# COPY ./apache2/conf/*.conf /etc/apache2/sites-available
+# RUN a2enmod ssl && a2ensite default-ssl
+
 
 EXPOSE 80 443 5060/tcp 5061/udp 10000-20000/udp 4569/udp
 

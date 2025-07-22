@@ -73,7 +73,7 @@ services:
   #     - app
 
   #   # set the domain & email for certbot here
-  #   command: certonly --keep-until-expiring --standalone --email test@test.com --agree-tos --no-eff-email -d vici-dev.protect247.app
+  #   command: certonly --keep-until-expiring --standalone --email test@test.com --agree-tos --no-eff-email -d test@test.com
 
   #   # set proper network_mode to bind port 80 and get certificate before webserver starts
   #   network_mode: host
