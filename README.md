@@ -1,51 +1,54 @@
-# Docker Compose Project
+# Vicidial in Docker
 
-This project uses Docker Compose to set up a multi-container application environment. The services defined include a MariaDB database, a Redis cache, and a Laravel-based application with PHP and Nginx.
+This project provides a Docker-based setup for running a self-hosted [Vicidial](http://www.vicidial.org/) call center solution. It uses multiple containers to separate concerns, including a MariaDB backend and a dialer application container. Optional support for Let's Encrypt certificates via Certbot is included (commented out for now).
 
-## Services
+---
 
-### 1. **app**
-- **Image**: `laravelphp/php-fpm`
-- **Ports**: Exposes port `9000` (internal use by Nginx)
-- **Volumes**: Mounts the application source code to `/var/www/html`
-- **Depends on**: `db`, `redis`
-- **Networks**: Connected to `frontend` and `backend`
+## 🧱 Services
 
-### 2. **nginx**
-- **Image**: `nginx:alpine`
-- **Ports**: Maps port `80` on the host to `80` in the container
-- **Volumes**:
-  - Application code
-  - Custom Nginx configuration (`./nginx/nginx.conf`)
-- **Depends on**: `app`
-- **Networks**: Connected to `frontend`
+### `db` - MariaDB Database
+- **Container Name:** `vicidial-db`
+- **Dockerfile:** `./docker/mysql/Dockerfile.mariadb`
+- **Environment Variables:** Loaded from `./docker/mysql/mysql.env`
+- **Volumes:**
+  - Persistent DB data: `db_data:/var/lib/mysql`
+  - DB logs: `db_log:/var/log/mysql`
+  - SQL import files: `./docker/mysql/import:/var/lib/mysql-files`
+- **Healthcheck:** Uses `mysqladmin ping` on socket `/tmp/mysql.sock`
+- **IP Address:** `10.10.10.10` (on backend network)
+- **Restart Policy:** `unless-stopped`
 
-### 3. **db**
-- **Image**: `mariadb:10.5`
-- **Environment**:
-  - `MYSQL_DATABASE`: `laravel`
-  - `MYSQL_USER`: `user`
-  - `MYSQL_PASSWORD`: `secret`
-  - `MYSQL_ROOT_PASSWORD`: `secret`
-- **Volumes**: Persists data to `dbdata`
-- **Networks**: Connected to `backend`
+---
 
-### 4. **redis**
-- **Image**: `redis:alpine`
-- **Networks**: Connected to `backend`
+### `dialer` - Vicidial Application
+- **Container Name:** `vicidial-dialer`
+- **Dockerfile:** `./docker/app/Dockerfile.ubuntu`
+- **Build Args:**
+  - `VICI_DB=10.10.10.10`
+  - `VICI_HOST=10.10.10.15`
+- **Volumes:**
+  - Web content: `/var/www/html`
+  - SSL Certs: 
+    - `./docker/certbot/letsencrypt/certs:/etc/letsencrypt`
+    - `./docker/certbot/letsencrypt/data:/var/lib/letsencrypt`
+- **Ports Exposed:**
+  - HTTP: `8080:80`
+  - SIP: `5060:5060`
+  - IAX2: `4569:4569`
+- **Networks:**
+  - `vici-backend` (IP: `10.10.10.15`)
+  - `vici-frontend`
+- **Depends On:** Waits for healthy `db`
 
-## Volumes
+---
 
-- `dbdata`: Stores MariaDB data persistently
+### (Optional) `certbot` - Let's Encrypt SSL Generation
+*Currently commented out.*
 
-## Networks
-
-- **frontend**: Handles external traffic via Nginx
-- **backend**: Handles internal traffic between `app`, `db`, and `redis`
-
-## Usage
-
-### Starting the Containers
-
-```bash
-docker-compose up -d
+- **Image:** `certbot/certbot`
+- **Volumes:** Inherits from `dialer`
+- **Command:**
+  ```bash
+  certonly --keep-until-expiring --standalone \
+    --email test@test.com --agree-tos \
+    --no-eff-email -d your.domainname.com

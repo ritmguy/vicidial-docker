@@ -28,7 +28,7 @@ services:
       - db_log:/var/log/mysql
       - ./docker/mysql/import:/var/lib/mysql-files
       
-  app:
+  dialer:
 
     container_name: vicidial-dialer
     build:
