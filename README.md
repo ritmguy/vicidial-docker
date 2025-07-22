@@ -4,7 +4,7 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
 
 ---
 
-## 🧱 Services
+## <i class="fas fa-headset"></i> Services
 
 ### `db` - MariaDB Database
 - **Container Name:** `vicidial-db`
@@ -51,4 +51,4 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
   ```bash
   certonly --keep-until-expiring --standalone \
     --email test@test.com --agree-tos \
-    --no-eff-email -d your.domainname.com
+    --no-eff-email -d vici-dev.protect247.app
