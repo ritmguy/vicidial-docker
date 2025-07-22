@@ -91,7 +91,8 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
 │           ├── certs/
 │           └── data/
 └── docker-compose.yml
-🛠 Troubleshooting
+
+## 🛠 Troubleshooting
 
 Stuck containers: Try docker compose down -v && docker compose up --build
 Database socket errors: Ensure /tmp/mysql.sock is correctly referenced in config and healthcheck
