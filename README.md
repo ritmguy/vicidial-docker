@@ -15,7 +15,8 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
   - DB logs: `db_log:/var/log/mysql`
   - SQL import files: `./docker/mysql/import:/var/lib/mysql-files`
 - **Healthcheck:** Uses `mysqladmin ping` on socket `/tmp/mysql.sock`
-- **IP Address:** `10.10.10.10` (on backend network)
+- **Networks:** 
+  - `vici-backend` (IP: `10.10.10.10`)
 - **Restart Policy:** `unless-stopped`
 
 ---
