@@ -161,7 +161,9 @@ RUN mkdir -p /usr/src/astguiclient && \
 COPY --chmod=0644 crontab /etc/cron.d/vici_cron
 COPY supervisord.conf /etc/supervisor/conf.d/
 COPY start_asterisk_boot.pl /usr/share/astguiclient/
+COPY --chmod=0644 ./apache2/html/* /var/www/html/
+COPY --chmod=0666 ./asterisk-conf/* /etc/asterisk/
 
-EXPOSE 80 5060 10000-20000
+EXPOSE 80 443 5060/tcp 5061/udp 10000-20000/udp 4569/udp
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

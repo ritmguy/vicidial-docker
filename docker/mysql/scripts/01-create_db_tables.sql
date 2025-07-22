@@ -20,22 +20,6 @@ Create asterisk database and vici specific users
 */
 
 
-/* UNCOMMENT BELOW FOR MARIADB ONLY!!!! */
-
-/*
-CREATE USER cron@'%' IDENTIFIED BY '1234';
-CREATE USER custom@'%' IDENTIFIED BY 'custom1234';
-CREATE USER custom@'localhost' IDENTIFIED BY 'custom1234';
-GRANT SELECT,INSERT,UPDATE,DELETE,LOCK TABLES on asterisk.* TO cron@'%' IDENTIFIED BY '1234';
-GRANT SELECT,INSERT,UPDATE,DELETE,LOCK TABLES on asterisk.* TO cron@localhost IDENTIFIED BY '1234';
-GRANT SELECT,INSERT,UPDATE,DELETE,LOCK TABLES on asterisk.* TO custom@'%' IDENTIFIED BY 'custom1234';
-GRANT SELECT,INSERT,UPDATE,DELETE,LOCK TABLES on asterisk.* TO custom@localhost IDENTIFIED BY 'custom1234';
-*/
-
-/*-------------------------------------------*/
-
-/* UNCOMMENT BELOW FOR MYSQL8 */
-
 /* Create users only if they don't exist */
 CREATE USER IF NOT EXISTS cron@'%' IDENTIFIED BY '1234';
 CREATE USER IF NOT EXISTS custom@'%' IDENTIFIED BY 'custom1234';
@@ -1626,7 +1610,6 @@ CREATE TABLE IF NOT EXISTS `servers` (
 --
 
 /*!40000 ALTER TABLE `servers` DISABLE KEYS */;
-INSERT INTO `servers` select 'vicibox12','DataBase Only - DO NOT DELETE','10.10.1.81','Y','1.4.21.2',0,'localhost',5038,'cron','1234','updatecron','listencron','sendcron','-5.00','85026666666666','8365','default','N','Y','FILE','N',0,'SERVER_IP','','N','Y','Y',5,0,0,0,'1','N',60,'Y',0,'Y','N','test','',NULL,'','---ALL---',NULL,3927,'/usr/src/astguiclient/trunk\nPath: .\nWorking Copy Root Path: /usr/src/astguiclient/trunk\nURL: svn://svn.eflo.net/agc_2-X/trunk\nRelative URL: ^/agc_2-X/trunk\nRepository Root: svn://svn.eflo.net\nRepository UUID: 3d104415-ff17-0410-8863-d5cf3c621b8a\nRevision: 3927\nNode Kind: directory\nSchedule: normal\nLast Changed Author: mattf\nLast Changed Rev: 3927\nLast Changed Date: 2025-06-21 09:14:04 -0400 (Sat, 21 Jun 2025)\n\n\n','0:07','N','N','85026666666667','N','','Y','13','','MEETME',60,NULL as data WHERE NOT EXISTS (SELECT 1 FROM servers);
 /*!40000 ALTER TABLE `servers` ENABLE KEYS */;
 
 --
@@ -3461,15 +3444,28 @@ CREATE TABLE IF NOT EXISTS `vicidial_call_menu` (
 --
 
 /*!40000 ALTER TABLE `vicidial_call_menu` DISABLE KEYS */;
-INSERT INTO `vicidial_call_menu` (menu_id, menu_name, menu_prompt, menu_timeout, menu_timeout_prompt, menu_invalid_prompt, menu_repeat, menu_time_check, call_time_id,
-track_in_vdac, custom_dialplan_entry, tracking_group, dtmf_log, dtmf_field, user_group, qualify_sql, alt_dtmf_log, question, answer_signal) 
-SELECT * FROM (
-    VALUES 
-    ROW('defaultlog','logging of all outbound calls from agent phones','sip-silence',20,'NONE','NONE',0,'0','','0','exten => _X.,1,AGI(agi-NVA_recording.agi,BOTH------Y---Y---Y)\nexten => _X.,n,Goto(default,${EXTEN},1)','','0','NONE','---ALL---',NULL,'0',NULL,'Y'),
-    ROW('default---agent','agent phones restricted to only internal extensions','sip-silence',20,'NONE','NONE',0,'0','','0','include => vicidial-auto-internal\ninclude => vicidial-auto-phones\n','','0','NONE','---ALL---',NULL,'0',NULL,'Y'),
-    ROW('2FA_say_auth_code','2FA_say_auth_code','sip-silence|hello|your|access-code|is|cm_speak_var.agi,say_digits---access_code---DP',1,'NONE','NONE',1,'0','24hours','1','','CALLMENU','0','NONE','---ALL---','','0',0,'Y')
-) as data(col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13, col14, col15, col16, col17, col18, col19)
-WHERE NOT EXISTS (SELECT 1 FROM vicidial_call_menu);
+INSERT INTO `vicidial_call_menu` (
+  menu_id, menu_name, menu_prompt, menu_timeout, menu_timeout_prompt, menu_invalid_prompt,
+  menu_repeat, menu_time_check, call_time_id, track_in_vdac, custom_dialplan_entry,
+  tracking_group, dtmf_log, dtmf_field, user_group, qualify_sql, alt_dtmf_log, question, answer_signal
+)
+SELECT 'defaultlog', 'logging of all outbound calls from agent phones', 'sip-silence', 20, 'NONE', 'NONE', 0, '0', '', '0',
+       'exten => _X.,1,AGI(agi-NVA_recording.agi,BOTH------Y---Y---Y)\nexten => _X.,n,Goto(default,${EXTEN},1)', '', '0', 'NONE', '---ALL---', NULL, '0', NULL, 'Y'
+FROM DUAL WHERE NOT EXISTS (
+  SELECT 1 FROM vicidial_call_menu WHERE menu_id = 'defaultlog'
+)
+UNION ALL
+SELECT 'default---agent', 'agent phones restricted to only internal extensions', 'sip-silence', 20, 'NONE', 'NONE', 0, '0', '', '0',
+       'include => vicidial-auto-internal\ninclude => vicidial-auto-phones\n', '', '0', 'NONE', '---ALL---', NULL, '0', NULL, 'Y'
+FROM DUAL WHERE NOT EXISTS (
+  SELECT 1 FROM vicidial_call_menu WHERE menu_id = 'default---agent'
+)
+UNION ALL
+SELECT '2FA_say_auth_code', '2FA_say_auth_code', 'sip-silence|hello|your|access-code|is|cm_speak_var.agi,say_digits---access_code---DP', 1, 'NONE', 'NONE', 1, '0', '24hours', '1',
+       '', 'CALLMENU', '0', 'NONE', '---ALL---', '', '0', 0, 'Y'
+FROM DUAL WHERE NOT EXISTS (
+  SELECT 1 FROM vicidial_call_menu WHERE menu_id = '2FA_say_auth_code'
+);
 /*!40000 ALTER TABLE `vicidial_call_menu` ENABLE KEYS */;
 
 --
@@ -3496,13 +3492,14 @@ CREATE TABLE IF NOT EXISTS `vicidial_call_menu_options` (
 
 /*!40000 ALTER TABLE `vicidial_call_menu_options` DISABLE KEYS */;
 INSERT INTO `vicidial_call_menu_options` (menu_id, option_value, option_description, option_route, option_route_value, option_route_value_context)
-SELECT * FROM (
-    VALUES 
-    ROW('defaultlog','TIMEOUT','hangup','HANGUP','vm-goodbye',''),
-    ROW('default---agent','TIMEOUT','hangup','HANGUP','vm-goodbye',''),
-    ROW('2FA_say_auth_code','TIMEOUT','','HANGUP','','')
-) as data(menu_id, option_value, option_description, option_route, option_route_value, option_route_value_context)
-WHERE NOT EXISTS (SELECT 1 FROM vicidial_call_menu_options);
+SELECT 'defaultlog', 'TIMEOUT', 'hangup', 'HANGUP', 'vm-goodbye', ''
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_call_menu_options WHERE menu_id = 'defaultlog' AND option_value = 'TIMEOUT')
+UNION ALL
+SELECT 'default---agent', 'TIMEOUT', 'hangup', 'HANGUP', 'vm-goodbye', ''
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_call_menu_options WHERE menu_id = 'default---agent' AND option_value = 'TIMEOUT')
+UNION ALL
+SELECT '2FA_say_auth_code', 'TIMEOUT', '', 'HANGUP', '', ''
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_call_menu_options WHERE menu_id = '2FA_say_auth_code' AND option_value = 'TIMEOUT');
 /*!40000 ALTER TABLE `vicidial_call_menu_options` ENABLE KEYS */;
 
 --
@@ -3645,22 +3642,18 @@ wednesday_afterhours_filename_override, thursday_afterhours_filename_override,
 friday_afterhours_filename_override, saturday_afterhours_filename_override, 
 user_group, ct_holidays, modify_stamp)
 SELECT * FROM (
-    VALUES 
-    ROW('24hours','default 24 hours calling','',0,2400,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('9am-9pm','default 9am to 9pm calling','',900,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('9am-5pm','default 9am to 5pm calling','',900,1700,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('12pm-5pm','default 12pm to 5pm calling','',1200,1700,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('12pm-9pm','default 12pm to 9pm calling','',1200,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('5pm-9pm','default 5pm to 9pm calling','',1700,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09')
-) as data(call_time_id, call_time_name, call_time_comments, ct_default_start, ct_default_stop, 
-ct_sunday_start, ct_sunday_stop, ct_monday_start, ct_monday_stop, ct_tuesday_start, 
-ct_tuesday_stop, ct_wednesday_start, ct_wednesday_stop, ct_thursday_start, ct_thursday_stop, 
-ct_friday_start, ct_friday_stop, ct_saturday_start, ct_saturday_stop, ct_state_call_times, 
-default_afterhours_filename_override, sunday_afterhours_filename_override, 
-monday_afterhours_filename_override, tuesday_afterhours_filename_override, 
-wednesday_afterhours_filename_override, thursday_afterhours_filename_override, 
-friday_afterhours_filename_override, saturday_afterhours_filename_override, 
-user_group, ct_holidays, modify_stamp)
+    SELECT '24hours' as call_time_id,'default 24 hours calling' as call_time_name,'' as call_time_comments,0 as ct_default_start,2400 as ct_default_stop,0 as ct_sunday_start,0 as ct_sunday_stop,0 as ct_monday_start,0 as ct_monday_stop,0 as ct_tuesday_start,0 as ct_tuesday_stop,0 as ct_wednesday_start,0 as ct_wednesday_stop,0 as ct_thursday_start,0 as ct_thursday_stop,0 as ct_friday_start,0 as ct_friday_stop,0 as ct_saturday_start,0 as ct_saturday_stop,NULL as ct_state_call_times,'' as default_afterhours_filename_override,'' as sunday_afterhours_filename_override,'' as monday_afterhours_filename_override,'' as tuesday_afterhours_filename_override,'' as wednesday_afterhours_filename_override,'' as thursday_afterhours_filename_override,'' as friday_afterhours_filename_override,'' as saturday_afterhours_filename_override,'---ALL---' as user_group,NULL as ct_holidays,'2025-06-23 16:43:09' as modify_stamp
+    UNION ALL
+    SELECT '9am-9pm','default 9am to 9pm calling','',900,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'
+    UNION ALL
+    SELECT '9am-5pm','default 9am to 5pm calling','',900,1700,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'
+    UNION ALL
+    SELECT '12pm-5pm','default 12pm to 5pm calling','',1200,1700,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'
+    UNION ALL
+    SELECT '12pm-9pm','default 12pm to 9pm calling','',1200,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'
+    UNION ALL
+    SELECT '5pm-9pm','default 5pm to 9pm calling','',1700,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NULL,'','','','','','','','','---ALL---',NULL,'2025-06-23 16:43:09'
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_call_times);
 /*!40000 ALTER TABLE `vicidial_call_times` ENABLE KEYS */;
 
@@ -3996,11 +3989,7 @@ status_category_count_4, hold_sec_stat_one, hold_sec_stat_two, agent_non_pause_s
 hold_sec_answer_calls, hold_sec_drop_calls, hold_sec_queue_calls, agent_calls_today, 
 agent_wait_today, agent_custtalk_today, agent_acw_today, agent_pause_today, 
 answering_machines_today, agenthandled_today, park_calls_today, park_sec_today)
-SELECT * FROM (
-    VALUES 
-    ROW('AGENTDIRECT','2025-06-23 16:45:05',0,0,0,0.000,'0','0',0,0,0,'0',0,0,0,'0',0,0,0,'0',0,0,0,'0','0','0',0,NULL,0,NULL,0,NULL,0,NULL,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 16:45:05',0,0,0,0.000,'0','0',0,0,0,'0',0,0,0,'0',0,0,0,'0',0,0,0,'0','0','0',0,NULL,0,NULL,0,NULL,0,NULL,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-) as data(campaign_id, update_time, dialable_leads, calls_today, answers_today, drops_today, 
+SELECT campaign_id, update_time, dialable_leads, calls_today, answers_today, drops_today, 
 drops_today_pct, drops_answers_today_pct, calls_hour, answers_hour, drops_hour, 
 drops_hour_pct, calls_halfhour, answers_halfhour, drops_halfhour, drops_halfhour_pct, 
 calls_fivemin, answers_fivemin, drops_fivemin, drops_fivemin_pct, calls_onemin, 
@@ -4010,7 +3999,12 @@ status_category_count_2, status_category_3, status_category_count_3, status_cate
 status_category_count_4, hold_sec_stat_one, hold_sec_stat_two, agent_non_pause_sec, 
 hold_sec_answer_calls, hold_sec_drop_calls, hold_sec_queue_calls, agent_calls_today, 
 agent_wait_today, agent_custtalk_today, agent_acw_today, agent_pause_today, 
-answering_machines_today, agenthandled_today, park_calls_today, park_sec_today)
+answering_machines_today, agenthandled_today, park_calls_today, park_sec_today
+FROM (
+    SELECT 'AGENTDIRECT' AS campaign_id, '2025-06-23 16:45:05' AS update_time, 0 AS dialable_leads, 0 AS calls_today, 0 AS answers_today, 0 AS drops_today, 0.000 AS drops_today_pct, '0' AS drops_answers_today_pct, 0 AS calls_hour, 0 AS answers_hour, 0 AS drops_hour, '0' AS drops_hour_pct, 0 AS calls_halfhour, 0 AS answers_halfhour, 0 AS drops_halfhour, '0' AS drops_halfhour_pct, 0 AS calls_fivemin, 0 AS answers_fivemin, 0 AS drops_fivemin, '0' AS drops_fivemin_pct, 0 AS calls_onemin, 0 AS answers_onemin, 0 AS drops_onemin, '0' AS drops_onemin_pct, '0' AS differential_onemin, '0' AS agents_average_onemin, 0 AS balance_trunk_fill, NULL AS status_category_1, 0 AS status_category_count_1, NULL AS status_category_2, 0 AS status_category_count_2, NULL AS status_category_3, 0 AS status_category_count_3, NULL AS status_category_4, 0 AS status_category_count_4, 0 AS hold_sec_stat_one, 0 AS hold_sec_stat_two, 0 AS agent_non_pause_sec, 0 AS hold_sec_answer_calls, 0 AS hold_sec_drop_calls, 0 AS hold_sec_queue_calls, 0 AS agent_calls_today, 0 AS agent_wait_today, 0 AS agent_custtalk_today, 0 AS agent_acw_today, 0 AS agent_pause_today, 0 AS answering_machines_today, 0 AS agenthandled_today, 0 AS park_calls_today, 0 AS park_sec_today
+    UNION ALL
+    SELECT 'AGENTDIRECT_CHAT', '2025-06-23 16:45:05', 0, 0, 0, 0, 0.000, '0', 0, 0, 0, '0', 0, 0, 0, '0', 0, 0, 0, '0', 0, 0, 0, '0', '0', '0', 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_campaign_stats);
 /*!40000 ALTER TABLE `vicidial_campaign_stats` ENABLE KEYS */;
 
@@ -4038,14 +4032,17 @@ CREATE TABLE IF NOT EXISTS `vicidial_campaign_stats_debug` (
 
 /*!40000 ALTER TABLE `vicidial_campaign_stats_debug` DISABLE KEYS */;
 INSERT INTO `vicidial_campaign_stats_debug` (campaign_id, server_ip, entry_time, update_time, debug_output, adapt_output)
-SELECT * FROM (
-    VALUES 
-    ROW('--ALL--', 'SHARED', NULL, '2025-06-23 16:45:05', NULL, NULL),
-    ROW('--CALLBACK-QUEUE--', 'ADAPT', '2025-06-23 12:51:06', '2025-06-23 16:51:06', NULL, '\nActive Inbound Callback Queue Entries: |0|\n\nOrphan SENDING Inbound Callback Queue Entries: |0|\n'),
-    ROW('--ABANDON-QUEUE--', 'ADAPT', NULL, '2025-06-23 16:45:05', NULL, NULL),
-    ROW('AGENTDIRECT', 'INBOUND', '2025-06-23 12:50:56', '2025-06-23 16:50:56', '     ANSWERED STATUSES: AGENTDIRECT|DROP,XDROP,CALLBK,CBHOLD,DEC,DNC,SALE,NI,NP,XFER,RQXFER,TIMEOT,AFTHRS,NANQUE,IQNANQ,PDROP,IVRXFR,SVYCLM,MLINAT,MAXCAL,LRERR,QCFAIL|\n     DAILY STATS|0|0|0|0         IN-GROUP: AGENTDIRECT   CALLS: 0   ANSWER: 0   DROPS: 0\n               Stat1: 0   Stat2: 0   Hold: 0|0|0\n', NULL),
-    ROW('AGENTDIRECT_CHAT', 'INBOUND', '2025-06-23 12:50:56', '2025-06-23 16:50:56', '     ANSWERED STATUSES: AGENTDIRECT_CHAT|DROP,XDROP,CALLBK,CBHOLD,DEC,DNC,SALE,NI,NP,XFER,RQXFER,TIMEOT,AFTHRS,NANQUE,IQNANQ,PDROP,IVRXFR,SVYCLM,MLINAT,MAXCAL,LRERR,QCFAIL|\n     DAILY STATS|0|0|0|1         IN-GROUP: AGENTDIRECT_CHAT   CALLS: 0   ANSWER: 0   DROPS: 0\n               Stat1: 0   Stat2: 0   Hold: 0|0|0\n', NULL)
-) as data(campaign_id, server_ip, entry_time, update_time, debug_output, adapt_output)
+SELECT campaign_id, server_ip, entry_time, update_time, debug_output, adapt_output FROM (
+  SELECT '--ALL--' AS campaign_id, 'SHARED' AS server_ip, NULL AS entry_time, '2025-06-23 16:45:05' AS update_time, NULL AS debug_output, NULL AS adapt_output
+  UNION ALL
+  SELECT '--CALLBACK-QUEUE--', 'ADAPT', '2025-06-23 12:51:06', '2025-06-23 16:51:06', NULL, '\nActive Inbound Callback Queue Entries: |0|\n\nOrphan SENDING Inbound Callback Queue Entries: |0|\n'
+  UNION ALL
+  SELECT '--ABANDON-QUEUE--', 'ADAPT', NULL, '2025-06-23 16:45:05', NULL, NULL
+  UNION ALL
+  SELECT 'AGENTDIRECT', 'INBOUND', '2025-06-23 12:50:56', '2025-06-23 16:50:56', '     ANSWERED STATUSES: AGENTDIRECT|DROP,XDROP,CALLBK,CBHOLD,DEC,DNC,SALE,NI,NP,XFER,RQXFER,TIMEOT,AFTHRS,NANQUE,IQNANQ,PDROP,IVRXFR,SVYCLM,MLINAT,MAXCAL,LRERR,QCFAIL|\n     DAILY STATS|0|0|0|0         IN-GROUP: AGENTDIRECT   CALLS: 0   ANSWER: 0   DROPS: 0\n               Stat1: 0   Stat2: 0   Hold: 0|0|0\n', NULL
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT', 'INBOUND', '2025-06-23 12:50:56', '2025-06-23 16:50:56', '     ANSWERED STATUSES: AGENTDIRECT_CHAT|DROP,XDROP,CALLBK,CBHOLD,DEC,DNC,SALE,NI,NP,XFER,RQXFER,TIMEOT,AFTHRS,NANQUE,IQNANQ,PDROP,IVRXFR,SVYCLM,MLINAT,MAXCAL,LRERR,QCFAIL|\n     DAILY STATS|0|0|0|1         IN-GROUP: AGENTDIRECT_CHAT   CALLS: 0   ANSWER: 0   DROPS: 0\n               Stat1: 0   Stat2: 0   Hold: 0|0|0\n', NULL
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_campaign_stats_debug);
 /*!40000 ALTER TABLE `vicidial_campaign_stats_debug` ENABLE KEYS */;
 
@@ -4938,14 +4935,16 @@ CREATE TABLE IF NOT EXISTS `vicidial_conf_templates` (
 --
 
 /*!40000 ALTER TABLE `vicidial_conf_templates` DISABLE KEYS */;
-INSERT INTO `vicidial_conf_templates` 
+INSERT INTO `vicidial_conf_templates` (template_id, template_name, template_contents, user_group)
 SELECT * FROM (
-    VALUES 
-    ROW('SIP_generic','SIP phone generic','type=friend\nhost=dynamic\ncanreinvite=no\ncontext=default','---ALL---'),
-    ROW('IAX_generic','IAX phone generic','type=friend\nhost=dynamic\nmaxauthreq=10\nauth=md5,plaintext,rsa\ncontext=default','---ALL---'),
-    ROW('VICIphoneSIP','VICIphoneSIP WebRTC','type=friend\r\nhost=dynamic\r\nencryption=yes\r\navpf=yes\r\nicesupport=yes\r\ndirectmedia=no\r\ntransport=wss\r\nforce_avp=yes\r\ndtlsenable=yes\r\ndtlsverify=no\r\ndtlscertfile=/etc/apache2/ssl.crt/vicibox.crt\r\ndtlsprivatekey=/etc/apache2/ssl.key/vicibox.key\r\ndtlssetup=actpass\r\nrtcp_mux=yes\r\n','---ALL---'),
-    ROW('VICIphonePJSIP','VICIphonePJSIP WebRTC','inbound_auth/nonce_lifetime = 32\r\naor/max_contacts = 1\r\naor/maximum_expiration = 3600\r\naor/minimum_expiration = 60\r\naor/default_expiration = 120\r\n\r\nendpoint/context = default\r\nendpoint/dtmf_mode = rfc4733\r\nendpoint/rtp_symmetric = yes\r\nendpoint/rewrite_contact = yes\r\nendpoint/rtp_timeout = 60\r\nendpoint/use_ptime = yes\r\nendpoint/moh_suggest = default\r\nendpoint/direct_media = no\r\nendpoint/trust_id_inbound = no\r\nendpoint/send_rpid = yes\r\nendpoint/inband_progress = no\r\nendpoint/tos_audio = ef\r\nendpoint/language = en\r\n\r\nendpoint/ice_support = yes\r\nendpoint/media_encryption = dtls\r\nendpoint/media_use_received_transport=yes\r\nendpoint/dtls_verify = no\r\nendpoint/dtls_cert_file = /etc/apache2/ssl.crt/vicibox.crt\r\nendpoint/dtls_private_key = /etc/apache2/ssl.key/vicibox.key\r\nendpoint/dtls_setup = actpass\r\nendpoint/transport=transport-wss\r\nendpoint/rtcp_mux=yes','---ALL---')
-) as data(template_id, template_name, template_contents, user_group)
+  SELECT 'SIP_generic' AS template_id, 'SIP phone generic' AS template_name, 'type=friend\nhost=dynamic\ncanreinvite=no\ncontext=default' AS template_contents, '---ALL---' AS user_group
+  UNION ALL
+  SELECT 'IAX_generic', 'IAX phone generic', 'type=friend\nhost=dynamic\nmaxauthreq=10\nauth=md5,plaintext,rsa\ncontext=default', '---ALL---'
+  UNION ALL
+  SELECT 'VICIphoneSIP', 'VICIphoneSIP WebRTC', 'type=friend\r\nhost=dynamic\r\nencryption=yes\r\navpf=yes\r\nicesupport=yes\r\ndirectmedia=no\r\ntransport=wss\r\nforce_avp=yes\r\ndtlsenable=yes\r\ndtlsverify=no\r\ndtlscertfile=/etc/apache2/ssl.crt/vicibox.crt\r\ndtlsprivatekey=/etc/apache2/ssl.key/vicibox.key\r\ndtlssetup=actpass\r\nrtcp_mux=yes\r\n', '---ALL---'
+  UNION ALL
+  SELECT 'VICIphonePJSIP', 'VICIphonePJSIP WebRTC', 'inbound_auth/nonce_lifetime = 32\r\naor/max_contacts = 1\r\naor/maximum_expiration = 3600\r\naor/minimum_expiration = 60\r\naor/default_expiration = 120\r\n\r\nendpoint/context = default\r\nendpoint/dtmf_mode = rfc4733\r\nendpoint/rtp_symmetric = yes\r\nendpoint/rewrite_contact = yes\r\nendpoint/rtp_timeout = 60\r\nendpoint/use_ptime = yes\r\nendpoint/moh_suggest = default\r\nendpoint/direct_media = no\r\nendpoint/trust_id_inbound = no\r\nendpoint/send_rpid = yes\r\nendpoint/inband_progress = no\r\nendpoint/tos_audio = ef\r\nendpoint/language = en\r\n\r\nendpoint/ice_support = yes\r\nendpoint/media_encryption = dtls\r\nendpoint/media_use_received_transport=yes\r\nendpoint/dtls_verify = no\r\nendpoint/dtls_cert_file = /etc/apache2/ssl.crt/vicibox.crt\r\nendpoint/dtls_private_key = /etc/apache2/ssl.key/vicibox.key\r\nendpoint/dtls_setup = actpass\r\nendpoint/transport=transport-wss\r\nendpoint/rtcp_mux=yes', '---ALL---'
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_conf_templates);
 /*!40000 ALTER TABLE `vicidial_conf_templates` ENABLE KEYS */;
 
@@ -5217,11 +5216,11 @@ CREATE TABLE IF NOT EXISTS `vicidial_daily_max_stats` (
 /*!40000 ALTER TABLE `vicidial_daily_max_stats` DISABLE KEYS */;
 INSERT INTO `vicidial_daily_max_stats` 
 (stats_date, stats_flag, stats_type, campaign_id, update_time, closed_time, max_channels, max_calls, max_inbound, max_outbound, max_agents, max_remote_agents, total_calls)
-SELECT * FROM (
-    VALUES 
-    ROW('2025-06-23','OPEN','INGROUP','AGENTDIRECT','2025-06-23 16:45:05',NULL,0,0,0,0,0,0,0),
-    ROW('2025-06-23','OPEN','INGROUP','AGENTDIRECT_CHAT','2025-06-23 16:45:05',NULL,0,0,0,0,0,0,0)
-) as data(stats_date, stats_flag, stats_type, campaign_id, update_time, closed_time, max_channels, max_calls, max_inbound, max_outbound, max_agents, max_remote_agents, total_calls)
+SELECT stats_date, stats_flag, stats_type, campaign_id, update_time, closed_time, max_channels, max_calls, max_inbound, max_outbound, max_agents, max_remote_agents, total_calls FROM (
+    SELECT '2025-06-23' AS stats_date, 'OPEN' AS stats_flag, 'INGROUP' AS stats_type, 'AGENTDIRECT' AS campaign_id, '2025-06-23 16:45:05' AS update_time, NULL AS closed_time, 0 AS max_channels, 0 AS max_calls, 0 AS max_inbound, 0 AS max_outbound, 0 AS max_agents, 0 AS max_remote_agents, 0 AS total_calls
+    UNION ALL
+    SELECT '2025-06-23', 'OPEN', 'INGROUP', 'AGENTDIRECT_CHAT', '2025-06-23 16:45:05', NULL, 0, 0, 0, 0, 0, 0, 0
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_daily_max_stats);
 /*!40000 ALTER TABLE `vicidial_daily_max_stats` ENABLE KEYS */;
 
@@ -5838,34 +5837,34 @@ CREATE TABLE IF NOT EXISTS `vicidial_drop_rate_groups` (
 /*!40000 ALTER TABLE `vicidial_drop_rate_groups` DISABLE KEYS */;
 INSERT INTO `vicidial_drop_rate_groups` 
 SELECT '101' as col1,'2025-06-23 16:43:09' as col2,0 as col3,0 as col4,0.000 as col5,'0' as col6,'0' as col7,0 as col8,0 as col9
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '101')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '101')
 UNION ALL
 SELECT '102','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '102')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '102')
 UNION ALL
 SELECT '103','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '103')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '103')
 UNION ALL
 SELECT '104','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '104')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '104')
 UNION ALL
 SELECT '105','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '105')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '105')
 UNION ALL
 SELECT '106','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '106')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '106')
 UNION ALL
 SELECT '107','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '107')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '107')
 UNION ALL
 SELECT '108','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '108')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '108')
 UNION ALL
 SELECT '109','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '109')
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '109')
 UNION ALL
 SELECT '110','2025-06-23 16:43:09',0,0,0.000,'0','0',0,0
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '110');
+WHERE NOT EXISTS (SELECT 1 FROM vicidial_drop_rate_groups WHERE group_id = '110');
 /*!40000 ALTER TABLE `vicidial_drop_rate_groups` ENABLE KEYS */;
 
 --
@@ -6757,14 +6756,6 @@ CREATE TABLE IF NOT EXISTS `vicidial_inbound_groups` (
 --
 
 /*!40000 ALTER TABLE `vicidial_inbound_groups` DISABLE KEYS */;
-INSERT INTO `vicidial_inbound_groups` 
-(group_id, group_name, group_color, active, web_form_address, voicemail_ext, next_agent_call, fronter_display, ingroup_script, get_call_launch, xferconf_a_dtmf, xferconf_a_number, xferconf_b_dtmf, xferconf_b_number, drop_call_seconds, drop_action, drop_exten, call_time_id, after_hours_action, after_hours_message_filename, after_hours_exten, after_hours_voicemail, welcome_message_filename, moh_context, onhold_prompt_filename, prompt_interval, agent_alert_exten, agent_alert_delay, default_xfer_group, queue_priority, drop_inbound_group, ingroup_recording_override, ingroup_rec_filename, afterhours_xfer_group, qc_enabled, qc_statuses, qc_shift_id, qc_get_record_launch, qc_show_recording, qc_web_form_address, qc_script, play_place_in_line, play_estimate_hold_time, hold_time_option, hold_time_option_seconds, hold_time_option_exten, hold_time_option_voicemail, hold_time_option_xfer_group, hold_time_option_callback_filename, hold_time_option_callback_list_id, hold_recall_xfer_group, no_delay_call_route, play_welcome_message, answer_sec_pct_rt_stat_one, answer_sec_pct_rt_stat_two, default_group_alias, no_agent_no_queue, no_agent_action, no_agent_action_value, web_form_address_two, timer_action, timer_action_message, timer_action_seconds, start_call_url, dispo_call_url, xferconf_c_number, xferconf_d_number, xferconf_e_number, ignore_list_script_override, extension_appended_cidname, uniqueid_status_display, uniqueid_status_prefix, hold_time_option_minimum, hold_time_option_press_filename, hold_time_option_callmenu, hold_time_option_no_block, hold_time_option_prompt_seconds, onhold_prompt_no_block, onhold_prompt_seconds, hold_time_second_option, hold_time_third_option, wait_hold_option_priority, wait_time_option, wait_time_second_option, wait_time_third_option, wait_time_option_seconds, wait_time_option_exten, wait_time_option_voicemail, wait_time_option_xfer_group, wait_time_option_callmenu, wait_time_option_callback_filename, wait_time_option_callback_list_id, wait_time_option_press_filename, wait_time_option_no_block, wait_time_option_prompt_seconds, timer_action_destination, calculate_estimated_hold_seconds, add_lead_url, eht_minimum_prompt_filename, eht_minimum_prompt_no_block, eht_minimum_prompt_seconds, on_hook_ring_time, na_call_url, on_hook_cid, group_calldate, action_xfer_cid, drop_callmenu, after_hours_callmenu, user_group, max_calls_method, max_calls_count, max_calls_action, dial_ingroup_cid, group_handling, web_form_address_three, populate_lead_ingroup, drop_lead_reset, after_hours_lead_reset, nanq_lead_reset, wait_time_lead_reset, hold_time_lead_reset, status_group_id, routing_initiated_recordings, on_hook_cid_number, customer_chat_screen_colors, customer_chat_survey_link, customer_chat_survey_text, populate_lead_province, areacode_filter, areacode_filter_seconds, areacode_filter_action, areacode_filter_action_value, populate_state_areacode, inbound_survey, inbound_survey_filename, inbound_survey_accept_digit, inbound_survey_question_filename, inbound_survey_callmenu, icbq_expiration_hours, closing_time_action, closing_time_now_trigger, closing_time_filename, closing_time_end_filename, closing_time_lead_reset, closing_time_option_exten, closing_time_option_callmenu, closing_time_option_voicemail, closing_time_option_xfer_group, closing_time_option_callback_list_id, add_lead_timezone, icbq_call_time_id, icbq_dial_filter, populate_lead_source, populate_lead_vendor, park_file_name, waiting_call_url_on, waiting_call_url_off, waiting_call_count, enter_ingroup_url, cid_cb_confirm_number, cid_cb_invalid_filter_phone_group, cid_cb_valid_length, cid_cb_valid_filename, cid_cb_confirmed_filename, cid_cb_enter_filename, cid_cb_you_entered_filename, cid_cb_press_to_confirm_filename, cid_cb_invalid_filename, cid_cb_reenter_filename, cid_cb_error_filename, place_in_line_caller_number_filename, place_in_line_you_next_filename, ingroup_script_two, browser_alert_sound, browser_alert_volume, answer_signal, no_agent_delay, agent_search_method, qc_scorecard_id, qc_statuses_id, populate_lead_comments, drop_call_seconds_override, populate_lead_owner, in_queue_nanque, in_queue_nanque_exceptions, custom_one, custom_two, custom_three, custom_four, custom_five, second_alert_trigger, second_alert_trigger_seconds, second_alert_filename, second_alert_delay, second_alert_container, second_alert_only, third_alert_trigger, third_alert_trigger_seconds, third_alert_filename, third_alert_delay, third_alert_container, third_alert_only, agent_search_list, state_descriptions, stereo_recording, modify_stamp)
-SELECT * FROM (
-    VALUES 
-    ROW('AGENTDIRECT','Single Agent Direct Queue','white','Y',NULL,NULL,'longest_wait_time','Y',NULL,'NONE',NULL,NULL,NULL,NULL,360,'MESSAGE','8307','24hours','MESSAGE','vm-goodbye','8300',NULL,'---NONE---','default','generic_hold',60,'ding',1000,'---NONE---',99,'---NONE---','DISABLED','NONE','---NONE---','N',NULL,'24HRMIDNIGHT','NONE','Y',NULL,NULL,'N','N','NONE',360,'8300','','---NONE---','vm-hangup',999,'---NONE---','N','ALWAYS',20,30,'','N','MESSAGE','nbdy-avail-to-take-call|vm-goodbye',NULL,'NONE','',-1,NULL,NULL,'','','','N','N','DISABLED','',0,'to-be-called-back|digits/1','','N',10,'N',9,'NONE','NONE','WAIT','NONE','NONE','NONE',120,'8300','','---NONE---','','vm-hangup',999,'to-be-called-back|digits/1','N',10,'',0,NULL,'','N',10,15,NULL,'CUSTOMER_PHONE_RINGAGENT',NULL,'CUSTOMER','','','---ALL---','DISABLED',0,'NO_AGENT_NO_QUEUE','','PHONE',NULL,'ENABLED','N','N','N','N','N','','Y','','default',NULL,NULL,'DISABLED','DISABLED',10,'MESSAGE','nbdy-avail-to-take-call|vm-goodbye','DISABLED','DISABLED',NULL,'',NULL,NULL,96,'DISABLED','N',NULL,NULL,'N','8300','','','---NONE---',999,'SERVER','24hours','NONE','DISABLED','INBOUND_NUMBER','',NULL,NULL,0,NULL,'NO','','10',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'','---NONE---',50,'START',0,'','','','CALLERID_NAME','DISABLED','DISABLED','N','',NULL,NULL,NULL,NULL,NULL,'DISABLED',600,'',1000,'DISABLED','DISABLED','DISABLED',600,'',1000,'DISABLED','DISABLED','','---DISABLED---','DISABLED','2025-06-23 16:43:09'),
-    ROW('AGENTDIRECT_CHAT','Agent Direct Queue for Chats','#FFFFFF','Y','','','longest_wait_time','Y','','NONE',NULL,NULL,NULL,NULL,360,'MESSAGE','8307','24hours','MESSAGE','vm-goodbye','8300',NULL,'---NONE---','default','generic_hold',60,'ding',1000,'---NONE---',99,'---NONE---','DISABLED','NONE','---NONE---','N',NULL,'24HRMIDNIGHT','NONE','Y',NULL,NULL,'N','N','NONE',360,'8300','','---NONE---','vm-hangup',0,'---NONE---','N','ALWAYS',20,30,'','N','MESSAGE','nbdy-avail-to-take-call|vm-goodbye','','NONE','',-1,'','','','','','N','N','DISABLED','',0,'to-be-called-back|digits/1','','N',10,'N',10,'NONE','NONE','WAIT','NONE','NONE','NONE',120,'8300','','---NONE---','','vm-hangup',999,'to-be-called-back|digits/1','N',10,'',0,'','','N',10,15,'','GENERIC',NULL,'CUSTOMER','','','---ALL---','DISABLED',0,'DROP','','CHAT','','ENABLED','N','N','N','N','N','','N','','default',NULL,NULL,'DISABLED','DISABLED',10,'MESSAGE','nbdy-avail-to-take-call|vm-goodbye','DISABLED','DISABLED',NULL,'',NULL,NULL,96,'DISABLED','N',NULL,NULL,'N','8300','','','---NONE---',999,'SERVER','24hours','NONE','DISABLED','INBOUND_NUMBER','',NULL,NULL,0,NULL,'NO','','10',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'','---NONE---',50,'START',0,'','','','CALLERID_NAME','DISABLED','DISABLED','N','',NULL,NULL,NULL,NULL,NULL,'DISABLED',600,'',1000,'DISABLED','DISABLED','DISABLED',600,'',1000,'DISABLED','DISABLED','','---DISABLED---','DISABLED','2025-06-23 16:43:09')
-) as data(group_id, group_name, group_color, active, web_form_address, voicemail_ext, next_agent_call, fronter_display, ingroup_script, get_call_launch, xferconf_a_dtmf, xferconf_a_number, xferconf_b_dtmf, xferconf_b_number, drop_call_seconds, drop_action, drop_exten, call_time_id, after_hours_action, after_hours_message_filename, after_hours_exten, after_hours_voicemail, welcome_message_filename, moh_context, onhold_prompt_filename, prompt_interval, agent_alert_exten, agent_alert_delay, default_xfer_group, queue_priority, drop_inbound_group, ingroup_recording_override, ingroup_rec_filename, afterhours_xfer_group, qc_enabled, qc_statuses, qc_shift_id, qc_get_record_launch, qc_show_recording, qc_web_form_address, qc_script, play_place_in_line, play_estimate_hold_time, hold_time_option, hold_time_option_seconds, hold_time_option_exten, hold_time_option_voicemail, hold_time_option_xfer_group, hold_time_option_callback_filename, hold_time_option_callback_list_id, hold_recall_xfer_group, no_delay_call_route, play_welcome_message, answer_sec_pct_rt_stat_one, answer_sec_pct_rt_stat_two, default_group_alias, no_agent_no_queue, no_agent_action, no_agent_action_value, web_form_address_two, timer_action, timer_action_message, timer_action_seconds, start_call_url, dispo_call_url, xferconf_c_number, xferconf_d_number, xferconf_e_number, ignore_list_script_override, extension_appended_cidname, uniqueid_status_display, uniqueid_status_prefix, hold_time_option_minimum, hold_time_option_press_filename, hold_time_option_callmenu, hold_time_option_no_block, hold_time_option_prompt_seconds, onhold_prompt_no_block, onhold_prompt_seconds, hold_time_second_option, hold_time_third_option, wait_hold_option_priority, wait_time_option, wait_time_second_option, wait_time_third_option, wait_time_option_seconds, wait_time_option_exten, wait_time_option_voicemail, wait_time_option_xfer_group, wait_time_option_callmenu, wait_time_option_callback_filename, wait_time_option_callback_list_id, wait_time_option_press_filename, wait_time_option_no_block, wait_time_option_prompt_seconds, timer_action_destination, calculate_estimated_hold_seconds, add_lead_url, eht_minimum_prompt_filename, eht_minimum_prompt_no_block, eht_minimum_prompt_seconds, on_hook_ring_time, na_call_url, on_hook_cid, group_calldate, action_xfer_cid, drop_callmenu, after_hours_callmenu, user_group, max_calls_method, max_calls_count, max_calls_action, dial_ingroup_cid, group_handling, web_form_address_three, populate_lead_ingroup, drop_lead_reset, after_hours_lead_reset, nanq_lead_reset, wait_time_lead_reset, hold_time_lead_reset, status_group_id, routing_initiated_recordings, on_hook_cid_number, customer_chat_screen_colors, customer_chat_survey_link, customer_chat_survey_text, populate_lead_province, areacode_filter, areacode_filter_seconds, areacode_filter_action, areacode_filter_action_value, populate_state_areacode, inbound_survey, inbound_survey_filename, inbound_survey_accept_digit, inbound_survey_question_filename, inbound_survey_callmenu, icbq_expiration_hours, closing_time_action, closing_time_now_trigger, closing_time_filename, closing_time_end_filename, closing_time_lead_reset, closing_time_option_exten, closing_time_option_callmenu, closing_time_option_voicemail, closing_time_option_xfer_group, closing_time_option_callback_list_id, add_lead_timezone, icbq_call_time_id, icbq_dial_filter, populate_lead_source, populate_lead_vendor, park_file_name, waiting_call_url_on, waiting_call_url_off, waiting_call_count, enter_ingroup_url, cid_cb_confirm_number, cid_cb_invalid_filter_phone_group, cid_cb_valid_length, cid_cb_valid_filename, cid_cb_confirmed_filename, cid_cb_enter_filename, cid_cb_you_entered_filename, cid_cb_press_to_confirm_filename, cid_cb_invalid_filename, cid_cb_reenter_filename, cid_cb_error_filename, place_in_line_caller_number_filename, place_in_line_you_next_filename, ingroup_script_two, browser_alert_sound, browser_alert_volume, answer_signal, no_agent_delay, agent_search_method, qc_scorecard_id, qc_statuses_id, populate_lead_comments, drop_call_seconds_override, populate_lead_owner, in_queue_nanque, in_queue_nanque_exceptions, custom_one, custom_two, custom_three, custom_four, custom_five, second_alert_trigger, second_alert_trigger_seconds, second_alert_filename, second_alert_delay, second_alert_container, second_alert_only, third_alert_trigger, third_alert_trigger_seconds, third_alert_filename, third_alert_delay, third_alert_container, third_alert_only, agent_search_list, state_descriptions, stereo_recording, modify_stamp)
-WHERE NOT EXISTS (SELECT 1 FROM vicidial_inbound_groups);
 
 /*!40000 ALTER TABLE `vicidial_inbound_groups` ENABLE KEYS */;
 
@@ -6852,36 +6843,61 @@ CREATE TABLE IF NOT EXISTS `vicidial_ingroup_hour_counts` (
 /*!40000 ALTER TABLE `vicidial_ingroup_hour_counts` DISABLE KEYS */;
 INSERT INTO `vicidial_ingroup_hour_counts` 
 (group_id, date_hour, next_hour, last_update, type, calls, hr)
-SELECT * FROM (
-    VALUES 
-    ROW('AGENTDIRECT','2025-06-23 12:00:00','2025-06-23 13:00:00','2025-06-23 12:50:56','CALLS',0,12),
-    ROW('AGENTDIRECT','2025-06-23 00:00:00','2025-06-23 01:00:00','2025-06-23 12:45:05','CALLS',0,0),
-    ROW('AGENTDIRECT','2025-06-23 01:00:00','2025-06-23 02:00:00','2025-06-23 12:45:05','CALLS',0,1),
-    ROW('AGENTDIRECT','2025-06-23 02:00:00','2025-06-23 03:00:00','2025-06-23 12:45:05','CALLS',0,2),
-    ROW('AGENTDIRECT','2025-06-23 03:00:00','2025-06-23 04:00:00','2025-06-23 12:45:05','CALLS',0,3),
-    ROW('AGENTDIRECT','2025-06-23 04:00:00','2025-06-23 05:00:00','2025-06-23 12:45:05','CALLS',0,4),
-    ROW('AGENTDIRECT','2025-06-23 05:00:00','2025-06-23 06:00:00','2025-06-23 12:45:05','CALLS',0,5),
-    ROW('AGENTDIRECT','2025-06-23 06:00:00','2025-06-23 07:00:00','2025-06-23 12:45:05','CALLS',0,6),
-    ROW('AGENTDIRECT','2025-06-23 07:00:00','2025-06-23 08:00:00','2025-06-23 12:45:05','CALLS',0,7),
-    ROW('AGENTDIRECT','2025-06-23 08:00:00','2025-06-23 09:00:00','2025-06-23 12:45:05','CALLS',0,8),
-    ROW('AGENTDIRECT','2025-06-23 09:00:00','2025-06-23 10:00:00','2025-06-23 12:45:05','CALLS',0,9),
-    ROW('AGENTDIRECT','2025-06-23 10:00:00','2025-06-23 11:00:00','2025-06-23 12:45:05','CALLS',0,10),
-    ROW('AGENTDIRECT','2025-06-23 11:00:00','2025-06-23 12:00:00','2025-06-23 12:45:05','CALLS',0,11),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 12:00:00','2025-06-23 13:00:00','2025-06-23 12:50:56','CALLS',0,12),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 00:00:00','2025-06-23 01:00:00','2025-06-23 12:45:05','CALLS',0,0),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 01:00:00','2025-06-23 02:00:00','2025-06-23 12:45:05','CALLS',0,1),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 02:00:00','2025-06-23 03:00:00','2025-06-23 12:45:05','CALLS',0,2),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 03:00:00','2025-06-23 04:00:00','2025-06-23 12:45:05','CALLS',0,3),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 04:00:00','2025-06-23 05:00:00','2025-06-23 12:45:05','CALLS',0,4),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 05:00:00','2025-06-23 06:00:00','2025-06-23 12:45:05','CALLS',0,5),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 06:00:00','2025-06-23 07:00:00','2025-06-23 12:45:05','CALLS',0,6),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 07:00:00','2025-06-23 08:00:00','2025-06-23 12:45:05','CALLS',0,7),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 08:00:00','2025-06-23 09:00:00','2025-06-23 12:45:05','CALLS',0,8),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 09:00:00','2025-06-23 10:00:00','2025-06-23 12:45:05','CALLS',0,9),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 10:00:00','2025-06-23 11:00:00','2025-06-23 12:45:05','CALLS',0,10),
-    ROW('AGENTDIRECT_CHAT','2025-06-23 11:00:00','2025-06-23 12:00:00','2025-06-23 12:45:05','CALLS',0,11)
-) as data(group_id, date_hour, next_hour, last_update, type, calls, hr)
+SELECT group_id, date_hour, next_hour, last_update, type, calls, hr FROM (
+  SELECT 'AGENTDIRECT' AS group_id, '2025-06-23 12:00:00' AS date_hour, '2025-06-23 13:00:00' AS next_hour, '2025-06-23 12:50:56' AS last_update, 'CALLS' AS type, 0 AS calls, 12 AS hr
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 00:00:00','2025-06-23 01:00:00','2025-06-23 12:45:05','CALLS',0,0
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 01:00:00','2025-06-23 02:00:00','2025-06-23 12:45:05','CALLS',0,1
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 02:00:00','2025-06-23 03:00:00','2025-06-23 12:45:05','CALLS',0,2
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 03:00:00','2025-06-23 04:00:00','2025-06-23 12:45:05','CALLS',0,3
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 04:00:00','2025-06-23 05:00:00','2025-06-23 12:45:05','CALLS',0,4
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 05:00:00','2025-06-23 06:00:00','2025-06-23 12:45:05','CALLS',0,5
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 06:00:00','2025-06-23 07:00:00','2025-06-23 12:45:05','CALLS',0,6
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 07:00:00','2025-06-23 08:00:00','2025-06-23 12:45:05','CALLS',0,7
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 08:00:00','2025-06-23 09:00:00','2025-06-23 12:45:05','CALLS',0,8
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 09:00:00','2025-06-23 10:00:00','2025-06-23 12:45:05','CALLS',0,9
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 10:00:00','2025-06-23 11:00:00','2025-06-23 12:45:05','CALLS',0,10
+  UNION ALL
+  SELECT 'AGENTDIRECT','2025-06-23 11:00:00','2025-06-23 12:00:00','2025-06-23 12:45:05','CALLS',0,11
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 12:00:00','2025-06-23 13:00:00','2025-06-23 12:50:56','CALLS',0,12
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 00:00:00','2025-06-23 01:00:00','2025-06-23 12:45:05','CALLS',0,0
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 01:00:00','2025-06-23 02:00:00','2025-06-23 12:45:05','CALLS',0,1
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 02:00:00','2025-06-23 03:00:00','2025-06-23 12:45:05','CALLS',0,2
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 03:00:00','2025-06-23 04:00:00','2025-06-23 12:45:05','CALLS',0,3
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 04:00:00','2025-06-23 05:00:00','2025-06-23 12:45:05','CALLS',0,4
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 05:00:00','2025-06-23 06:00:00','2025-06-23 12:45:05','CALLS',0,5
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 06:00:00','2025-06-23 07:00:00','2025-06-23 12:45:05','CALLS',0,6
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 07:00:00','2025-06-23 08:00:00','2025-06-23 12:45:05','CALLS',0,7
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 08:00:00','2025-06-23 09:00:00','2025-06-23 12:45:05','CALLS',0,8
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 09:00:00','2025-06-23 10:00:00','2025-06-23 12:45:05','CALLS',0,9
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 10:00:00','2025-06-23 11:00:00','2025-06-23 12:45:05','CALLS',0,10
+  UNION ALL
+  SELECT 'AGENTDIRECT_CHAT','2025-06-23 11:00:00','2025-06-23 12:00:00','2025-06-23 12:45:05','CALLS',0,11
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_ingroup_hour_counts);
+
 
 /*!40000 ALTER TABLE `vicidial_ingroup_hour_counts` ENABLE KEYS */;
 
@@ -6956,10 +6972,10 @@ CREATE TABLE IF NOT EXISTS `vicidial_ip_lists` (
 INSERT INTO `vicidial_ip_lists` 
 (ip_list_id, ip_list_name, active, user_group)
 SELECT * FROM (
-    VALUES 
-    ROW('ViciWhite','White List for ViciBox firewall ACL','N','---ALL---'),
-    ROW('ViciBlack','Black List for ViciBox firewall ACL','N','---ALL---')
-) as data(ip_list_id, ip_list_name, active, user_group)
+    SELECT 'ViciWhite','White List for ViciBox firewall ACL','N','---ALL---'
+    UNION ALL
+    SELECT 'ViciBlack','Black List for ViciBox firewall ACL','N','---ALL---'
+) as data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_ip_lists);
 /*!40000 ALTER TABLE `vicidial_ip_lists` ENABLE KEYS */;
 
@@ -7701,11 +7717,11 @@ CREATE TABLE IF NOT EXISTS `vicidial_lists` (
 /*!40000 ALTER TABLE `vicidial_lists` DISABLE KEYS */;
 INSERT INTO `vicidial_lists` 
 (list_id, list_name, campaign_id, active, list_description, list_changedate, list_lastcalldate, reset_time, agent_script_override, campaign_cid_override, am_message_exten_override, drop_inbound_group_override, xferconf_a_number, xferconf_b_number, xferconf_c_number, xferconf_d_number, xferconf_e_number, web_form_address, web_form_address_two, time_zone_setting, inventory_report, expiration_date, na_call_url, local_call_time, web_form_address_three, status_group_id, user_new_lead_limit, inbound_list_script_override, default_xfer_group, daily_reset_limit, resets_today, auto_active_list_rank, cache_count, cache_count_new, cache_count_dialable_new, cache_date, inbound_drop_voicemail, inbound_after_hours_voicemail, qc_scorecard_id, qc_statuses_id, qc_web_form_address, auto_alt_threshold, cid_group_id, dial_prefix, weekday_resets_container)
-SELECT * FROM (
-    VALUES 
-    ROW(999,'Default inbound list','TESTCAMP','N',NULL,NULL,NULL,'','','','','','','','','','',NULL,NULL,'COUNTRY_AND_AREA_CODE','Y','2099-12-31',NULL,'campaign',NULL,'',-1,NULL,'---NONE---',-1,0,0,0,0,0,NULL,NULL,NULL,'','','',-1,'---DISABLED---','','DISABLED'),
-    ROW(998,'Default Manual list','TESTCAMP','N',NULL,NULL,NULL,'','','','','','','','','','',NULL,NULL,'COUNTRY_AND_AREA_CODE','Y','2099-12-31',NULL,'campaign',NULL,'',-1,NULL,'---NONE---',-1,0,0,0,0,0,NULL,NULL,NULL,'','','',-1,'---DISABLED---','','DISABLED')
-) as data(list_id, list_name, campaign_id, active, list_description, list_changedate, list_lastcalldate, reset_time, agent_script_override, campaign_cid_override, am_message_exten_override, drop_inbound_group_override, xferconf_a_number, xferconf_b_number, xferconf_c_number, xferconf_d_number, xferconf_e_number, web_form_address, web_form_address_two, time_zone_setting, inventory_report, expiration_date, na_call_url, local_call_time, web_form_address_three, status_group_id, user_new_lead_limit, inbound_list_script_override, default_xfer_group, daily_reset_limit, resets_today, auto_active_list_rank, cache_count, cache_count_new, cache_count_dialable_new, cache_date, inbound_drop_voicemail, inbound_after_hours_voicemail, qc_scorecard_id, qc_statuses_id, qc_web_form_address, auto_alt_threshold, cid_group_id, dial_prefix, weekday_resets_container)
+SELECT list_id, list_name, campaign_id, active, list_description, list_changedate, list_lastcalldate, reset_time, agent_script_override, campaign_cid_override, am_message_exten_override, drop_inbound_group_override, xferconf_a_number, xferconf_b_number, xferconf_c_number, xferconf_d_number, xferconf_e_number, web_form_address, web_form_address_two, time_zone_setting, inventory_report, expiration_date, na_call_url, local_call_time, web_form_address_three, status_group_id, user_new_lead_limit, inbound_list_script_override, default_xfer_group, daily_reset_limit, resets_today, auto_active_list_rank, cache_count, cache_count_new, cache_count_dialable_new, cache_date, inbound_drop_voicemail, inbound_after_hours_voicemail, qc_scorecard_id, qc_statuses_id, qc_web_form_address, auto_alt_threshold, cid_group_id, dial_prefix, weekday_resets_container FROM (
+    SELECT 999 AS list_id,'Default inbound list' AS list_name,'TESTCAMP' AS campaign_id,'N' AS active,NULL AS list_description,NULL AS list_changedate,NULL AS list_lastcalldate,'' AS reset_time,'' AS agent_script_override,'' AS campaign_cid_override,'' AS am_message_exten_override,'' AS drop_inbound_group_override,'' AS xferconf_a_number,'' AS xferconf_b_number,'' AS xferconf_c_number,'' AS xferconf_d_number,'' AS xferconf_e_number,NULL AS web_form_address,NULL AS web_form_address_two,'COUNTRY_AND_AREA_CODE' AS time_zone_setting,'Y' AS inventory_report,'2099-12-31' AS expiration_date,NULL AS na_call_url,'campaign' AS local_call_time,NULL AS web_form_address_three,'' AS status_group_id,-1 AS user_new_lead_limit,NULL AS inbound_list_script_override,'---NONE---' AS default_xfer_group,-1 AS daily_reset_limit,0 AS resets_today,0 AS auto_active_list_rank,0 AS cache_count,0 AS cache_count_new,0 AS cache_count_dialable_new,NULL AS cache_date,NULL AS inbound_drop_voicemail,NULL AS inbound_after_hours_voicemail,'' AS qc_scorecard_id,'' AS qc_statuses_id,'' AS qc_web_form_address,-1 AS auto_alt_threshold,'---DISABLED---' AS cid_group_id,'' AS dial_prefix,'DISABLED' AS weekday_resets_container
+    UNION ALL
+    SELECT 998,'Default Manual list','TESTCAMP','N',NULL,NULL,NULL,'','','','','','','','','','',NULL,NULL,'COUNTRY_AND_AREA_CODE','Y','2099-12-31',NULL,'campaign',NULL,'',-1,NULL,'---NONE---',-1,0,0,0,0,0,NULL,NULL,NULL,'','','',-1,'---DISABLED---','','DISABLED'
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_lists WHERE list_id IN (999, 998));
 /*!40000 ALTER TABLE `vicidial_lists` ENABLE KEYS */;
 
@@ -8664,7 +8680,7 @@ SELECT * FROM (
     UNION ALL SELECT 'vicidial_lead_filters','0',70000
     UNION ALL SELECT 'vicidial_scripts','0',80000
     UNION ALL SELECT 'phones','0',100
-) as data(id_table, active, value) 
+) as data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_override_ids);
 /*!40000 ALTER TABLE `vicidial_override_ids` ENABLE KEYS */;
 
@@ -9021,13 +9037,15 @@ CREATE TABLE IF NOT EXISTS `vicidial_qc_codes` (
 /*!40000 ALTER TABLE `vicidial_qc_codes` DISABLE KEYS */;
 INSERT INTO `vicidial_qc_codes` 
 (code, code_name, qc_result_type)
-SELECT * FROM (
-    VALUES 
-    ROW('QCPASS','PASS','PASS'),
-    ROW('QCFAIL','FAIL','FAIL'),
-    ROW('QCCANCEL','CANCEL','CANCEL')
-) as data(code, code_name, qc_result_type)
+SELECT code, code_name, qc_result_type FROM (
+    SELECT 'QCPASS' AS code, 'PASS' AS code_name, 'PASS' AS qc_result_type
+    UNION ALL
+    SELECT 'QCFAIL', 'FAIL', 'FAIL'
+    UNION ALL
+    SELECT 'QCCANCEL', 'CANCEL', 'CANCEL'
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_qc_codes);
+
 /*!40000 ALTER TABLE `vicidial_qc_codes` ENABLE KEYS */;
 
 --
@@ -9339,19 +9357,27 @@ CREATE TABLE IF NOT EXISTS `vicidial_screen_colors` (
 /*!40000 ALTER TABLE `vicidial_screen_colors` DISABLE KEYS */;
 INSERT INTO `vicidial_screen_colors` 
 (colors_id, colors_name, active, menu_background, frame_background, std_row1_background, std_row2_background, std_row3_background, std_row4_background, std_row5_background, alt_row1_background, alt_row2_background, alt_row3_background, user_group, web_logo, button_color)
-SELECT * FROM (
-    VALUES 
-    ROW('red_rust','dark red rust','Y','804435','E7D0C2','C68C71','D9B39F','D9B49F','C68C72','C68C73','BDFFBD','99FF99','CCFFCC','---ALL---','default_new','EFEFEF'),
-    ROW('pale_green','pale green','Y','738035','E0E7C2','B6C572','C4CF8B','B6C572','C4CF8B','C4CF8B','BDFFBD','99FF99','CCFFCC','---ALL---','default_new','EFEFEF'),
-    ROW('alt_green','alternate green','Y','333333','D6E3B2','AEC866','BCD180','BCD180','AEC866','AEC866','BDFFBD','99FF99','CCFFCC','---ALL---','default_new','EFEFEF'),
-    ROW('default_blue_test','default blue test','Y','015B91','D9E6FE','9BB9FB','B9CBFD','8EBCFD','B6D3FC','A3C3D6','BDFFBD','99FF99','CCFFCC','---ALL---','default_new','EFEFEF'),
-    ROW('basic_orange','basic orange','Y','804d00','ffebcc','ffcc80','ffd699','ffcc80','ffd699','ffcc80','BDFFBD','99FF99','CCFFCC','---ALL---','default_new','EFEFEF'),
-    ROW('basic_purple','basic purple','Y','660066','ffccff','ff99ff','ffb3ff','ff99ff','ffb3ff','ff99ff','BDFFBD','99FF99','CCFFCC','---ALL---','SAMPLE.png','EFEFEF'),
-    ROW('basic_yellow','basic yellow','Y','666600','ffffcc','ffff66','ffff99','ffff66','ffff99','ffff66','BDFFBD','99FF99','CCFFCC','---ALL---','default_new','EFEFEF'),
-    ROW('basic_red','basic red','Y','800000','ffe6e6','ff9999','ffb3b3','ff9999','ffb3b3','ff9999','BDFFBD','99FF99','CCFFCC','---ALL---','default_new','EFEFEF'),
-    ROW('default_grey_agent','default grey agent','Y','FFFFFF','cccccc','E6E6E6','E6E6E6','E6E6E6','E6E6E6','E6E6E6','E6E6E6','E6E6E6','E6E6E6','---ALL---','DEFAULTAGENT.png','EFEFEF')
-) as data(colors_id, colors_name, active, menu_background, frame_background, std_row1_background, std_row2_background, std_row3_background, std_row4_background, std_row5_background, alt_row1_background, alt_row2_background, alt_row3_background, user_group, web_logo, button_color)
+SELECT colors_id, colors_name, active, menu_background, frame_background, std_row1_background, std_row2_background, std_row3_background, std_row4_background, std_row5_background, alt_row1_background, alt_row2_background, alt_row3_background, user_group, web_logo, button_color FROM (
+  SELECT 'red_rust' AS colors_id, 'dark red rust' AS colors_name, 'Y' AS active, '804435' AS menu_background, 'E7D0C2' AS frame_background, 'C68C71' AS std_row1_background, 'D9B39F' AS std_row2_background, 'D9B49F' AS std_row3_background, 'C68C72' AS std_row4_background, 'C68C73' AS std_row5_background, 'BDFFBD' AS alt_row1_background, '99FF99' AS alt_row2_background, 'CCFFCC' AS alt_row3_background, '---ALL---' AS user_group, 'default_new' AS web_logo, 'EFEFEF' AS button_color
+  UNION ALL
+  SELECT 'pale_green', 'pale green', 'Y', '738035', 'E0E7C2', 'B6C572', 'C4CF8B', 'B6C572', 'C4CF8B', 'C4CF8B', 'BDFFBD', '99FF99', 'CCFFCC', '---ALL---', 'default_new', 'EFEFEF'
+  UNION ALL
+  SELECT 'alt_green', 'alternate green', 'Y', '333333', 'D6E3B2', 'AEC866', 'BCD180', 'BCD180', 'AEC866', 'AEC866', 'BDFFBD', '99FF99', 'CCFFCC', '---ALL---', 'default_new', 'EFEFEF'
+  UNION ALL
+  SELECT 'default_blue_test', 'default blue test', 'Y', '015B91', 'D9E6FE', '9BB9FB', 'B9CBFD', '8EBCFD', 'B6D3FC', 'A3C3D6', 'BDFFBD', '99FF99', 'CCFFCC', '---ALL---', 'default_new', 'EFEFEF'
+  UNION ALL
+  SELECT 'basic_orange', 'basic orange', 'Y', '804d00', 'ffebcc', 'ffcc80', 'ffd699', 'ffcc80', 'ffd699', 'ffcc80', 'BDFFBD', '99FF99', 'CCFFCC', '---ALL---', 'default_new', 'EFEFEF'
+  UNION ALL
+  SELECT 'basic_purple', 'basic purple', 'Y', '660066', 'ffccff', 'ff99ff', 'ffb3ff', 'ff99ff', 'ffb3ff', 'ff99ff', 'BDFFBD', '99FF99', 'CCFFCC', '---ALL---', 'SAMPLE.png', 'EFEFEF'
+  UNION ALL
+  SELECT 'basic_yellow', 'basic yellow', 'Y', '666600', 'ffffcc', 'ffff66', 'ffff99', 'ffff66', 'ffff99', 'ffff66', 'BDFFBD', '99FF99', 'CCFFCC', '---ALL---', 'default_new', 'EFEFEF'
+  UNION ALL
+  SELECT 'basic_red', 'basic red', 'Y', '800000', 'ffe6e6', 'ff9999', 'ffb3b3', 'ff9999', 'ffb3b3', 'ff9999', 'BDFFBD', '99FF99', 'CCFFCC', '---ALL---', 'default_new', 'EFEFEF'
+  UNION ALL
+  SELECT 'default_grey_agent', 'default grey agent', 'Y', 'FFFFFF', 'cccccc', 'E6E6E6', 'E6E6E6', 'E6E6E6', 'E6E6E6', 'E6E6E6', 'E6E6E6', 'E6E6E6', 'E6E6E6', '---ALL---', 'DEFAULTAGENT.png', 'EFEFEF'
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_screen_colors);
+
 /*!40000 ALTER TABLE `vicidial_screen_colors` ENABLE KEYS */;
 
 --
@@ -9509,15 +9535,39 @@ CREATE TABLE IF NOT EXISTS `vicidial_server_carriers` (
 /*!40000 ALTER TABLE `vicidial_server_carriers` DISABLE KEYS */;
 INSERT INTO `vicidial_server_carriers` 
 (carrier_id, carrier_name, registration_string, template_id, account_entry, protocol, globals_string, dialplan_entry, server_ip, active, carrier_description, user_group)
-SELECT * FROM (
-    VALUES 
-    ROW('OLD_SIPEXAMPLE','OLD TEST SIP carrier example','register => testcarrier:test@10.10.10.15:5060','--NONE--','[testcarrier]\ndisallow=all\nallow=ulaw\ntype=friend\nusername=testcarrier\nsecret=test\nhost=dynamic\ndtmfmode=rfc2833\ncontext=trunkinbound\n','SIP','TESTSIPTRUNK = SIP/testcarrier','exten => _91999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _91999NXXXXXX,2,Dial(${TESTSIPTRUNK}/${EXTEN:2},${CAMPDTO},To)\nexten => _91999NXXXXXX,3,Hangup\n','10.10.10.15','N',NULL,'---ALL---'),
-    ROW('OLD_IAXEXAMPLE','OLD TEST IAX carrier example','register => testcarrier:test@10.10.10.15:4569','--NONE--','[testcarrier]\ndisallow=all\nallow=ulaw\ntype=friend\naccountcode=testcarrier\nsecret=test\nhost=dynamic\ncontext=trunkinbound\n','IAX2','TESTIAXTRUNK = IAX2/testcarrier','exten => _71999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _71999NXXXXXX,2,Dial(${TESTIAXTRUNK}/${EXTEN:2},${CAMPDTO},To)\nexten => _71999NXXXXXX,3,Hangup\n','10.10.10.15','N',NULL,'---ALL---'),
-    ROW('SIPExample','SIP Example','','--NONE--','[ExampleSIP]\ntype = peer\ncontext = trunkinbound\nusecallerid = yes\ntrustrpid = no\nsendrpid = yes\nhost = 10.10.10.15\nqualify = yes\ninsecure = port,invite\ndisallow = all\nallow = ulaw\ndtmfmode = auto','SIP','SIPTRUNK = SIP/ExampleSIP','exten => _91999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _91999NXXXXXX,2,Dial(${SIPTRUNK}/${EXTEN:1},${CAMPDTO},To)\nexten => _91999NXXXXXX,3,Hangup','0.0.0.0','N','A SIP example carrier using IP Authentication','---ALL---'),
-    ROW('PJSIPExample','PJSIP Example','','--NONE--','[ExamplePJSIP]\ntype = aor\ncontact = sip:10.10.10.15\nqualify_frequency = 15\nmaximum_expiration = 3600\nminimum_expiration = 60\ndefault_expiration = 120\n\n[ExamplePJSIP]\ntype = identify\nendpoint = ExamplePJSIP\nmatch = 10.10.10.15\n\n[ExamplePJSIP]\ntype = endpoint\ncontext = trunkinbound\ndtmf_mode = rfc4733\ndisallow = all\nallow = ulaw\nrtp_symmetric = yes\nrewrite_contact = yes\nrtp_timeout = 60\nuse_ptime = yes\nmoh_suggest = default\ndirect_media = no\ntrust_id_inbound = yes\nsend_rpid = yes\ninband_progress = no\ntos_audio = ef\nlanguage = en\naors = ExamplePJSIP\ndtmf_mode=auto','PJSIP','PJTRUNK=ExamplePJSIP','exten => _91999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _91999NXXXXXX,n,Dial(PJSIP/${EXTEN:1}@${PJTRUNK},${CAMPDTO},To)\nexten => _91999NXXXXXX,n,Hangup()','0.0.0.0','N','A PJSIP example carrier using IP authentication','---ALL---'),
-    ROW('PJSIPWIZExample','PJSIP_WIZ Example','','--NONE--','[ExamplePJSIPWIZ]\ntype = wizard\nremote_hosts = 10.10.10.15:5060\nsends_registrations = no\naccepts_registrations = no\nsends_auth = no\naccepts_auth = no\naor/qualify_frequency = 15\naor/maximum_expiration = 3600\naor/minimum_expiration = 60\naor/default_expiration = 120\nendpoint/allow_subscribe = no\nendpoint/context = trunkinbound\nendpoint/dtmf_mode = auto\nendpoint/disallow = all\nendpoint/allow = ulaw\nendpoint/rtp_symmetric = yes\nendpoint/rewrite_contact = yes\nendpoint/rtp_timeout = 60\nendpoint/use_ptime = yes\nendpoint/moh_suggest = default\nendpoint/direct_media = no\nendpoint/trust_id_inbound = yes\nendpoint/send_rpid = yes\nendpoint/inband_progress = no\nendpoint/tos_audio = ef\nendpoint/language = en','PJSIP_WIZ','WIZTRK=ExamplePJSIPWIZ','exten => _91999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _91999NXXXXXX,n,Dial(PJSIP/${EXTEN:1}@${WIZTRK},${CAMPDTO},To)\nexten => _91999NXXXXXX,n,Hangup()','0.0.0.0','N','A PJSIP_WIZ example carrier using IP authentication','---ALL---')
-) as data(carrier_id, carrier_name, registration_string, template_id, account_entry, protocol, globals_string, dialplan_entry, server_ip, active, carrier_description, user_group)
+SELECT carrier_id, carrier_name, registration_string, template_id, account_entry, protocol, globals_string, dialplan_entry, server_ip, active, carrier_description, user_group FROM (
+  SELECT 'OLD_SIPEXAMPLE' AS carrier_id, 'OLD TEST SIP carrier example' AS carrier_name, 'register => testcarrier:test@10.10.10.15:5060' AS registration_string, '--NONE--' AS template_id,
+         '[testcarrier]\ndisallow=all\nallow=ulaw\ntype=friend\nusername=testcarrier\nsecret=test\nhost=dynamic\ndtmfmode=rfc2833\ncontext=trunkinbound\n' AS account_entry, 'SIP' AS protocol,
+         'TESTSIPTRUNK = SIP/testcarrier' AS globals_string,
+         'exten => _91999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _91999NXXXXXX,2,Dial(${TESTSIPTRUNK}/${EXTEN:2},${CAMPDTO},To)\nexten => _91999NXXXXXX,3,Hangup\n' AS dialplan_entry,
+         '10.10.10.15' AS server_ip, 'N' AS active, NULL AS carrier_description, '---ALL---' AS user_group
+  UNION ALL
+  SELECT 'OLD_IAXEXAMPLE', 'OLD TEST IAX carrier example', 'register => testcarrier:test@10.10.10.15:4569', '--NONE--',
+         '[testcarrier]\ndisallow=all\nallow=ulaw\ntype=friend\naccountcode=testcarrier\nsecret=test\nhost=dynamic\ncontext=trunkinbound\n', 'IAX2',
+         'TESTIAXTRUNK = IAX2/testcarrier',
+         'exten => _71999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _71999NXXXXXX,2,Dial(${TESTIAXTRUNK}/${EXTEN:2},${CAMPDTO},To)\nexten => _71999NXXXXXX,3,Hangup\n',
+         '10.10.10.15', 'N', NULL, '---ALL---'
+  UNION ALL
+  SELECT 'SIPExample', 'SIP Example', '', '--NONE--',
+         '[ExampleSIP]\ntype = peer\ncontext = trunkinbound\nusecallerid = yes\ntrustrpid = no\nsendrpid = yes\nhost = 10.10.10.15\nqualify = yes\ninsecure = port,invite\ndisallow = all\nallow = ulaw\ndtmfmode = auto', 'SIP',
+         'SIPTRUNK = SIP/ExampleSIP',
+         'exten => _91999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _91999NXXXXXX,2,Dial(${SIPTRUNK}/${EXTEN:1},${CAMPDTO},To)\nexten => _91999NXXXXXX,3,Hangup',
+         '0.0.0.0', 'N', 'A SIP example carrier using IP Authentication', '---ALL---'
+  UNION ALL
+  SELECT 'PJSIPExample', 'PJSIP Example', '', '--NONE--',
+         '[ExamplePJSIP]\ntype = aor\ncontact = sip:10.10.10.15\nqualify_frequency = 15\nmaximum_expiration = 3600\nminimum_expiration = 60\ndefault_expiration = 120\n\n[ExamplePJSIP]\ntype = identify\nendpoint = ExamplePJSIP\nmatch = 10.10.10.15\n\n[ExamplePJSIP]\ntype = endpoint\ncontext = trunkinbound\ndtmf_mode = rfc4733\ndisallow = all\nallow = ulaw\nrtp_symmetric = yes\nrewrite_contact = yes\nrtp_timeout = 60\nuse_ptime = yes\nmoh_suggest = default\ndirect_media = no\ntrust_id_inbound = yes\nsend_rpid = yes\ninband_progress = no\ntos_audio = ef\nlanguage = en\naors = ExamplePJSIP\ndtmf_mode=auto', 'PJSIP',
+         'PJTRUNK=ExamplePJSIP',
+         'exten => _91999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _91999NXXXXXX,n,Dial(PJSIP/${EXTEN:1}@${PJTRUNK},${CAMPDTO},To)\nexten => _91999NXXXXXX,n,Hangup()',
+         '0.0.0.0', 'N', 'A PJSIP example carrier using IP authentication', '---ALL---'
+  UNION ALL
+  SELECT 'PJSIPWIZExample', 'PJSIP_WIZ Example', '', '--NONE--',
+         '[ExamplePJSIPWIZ]\ntype = wizard\nremote_hosts = 10.10.10.15:5060\nsends_registrations = no\naccepts_registrations = no\nsends_auth = no\naccepts_auth = no\naor/qualify_frequency = 15\naor/maximum_expiration = 3600\naor/minimum_expiration = 60\naor/default_expiration = 120\nendpoint/allow_subscribe = no\nendpoint/context = trunkinbound\nendpoint/dtmf_mode = auto\nendpoint/disallow = all\nendpoint/allow = ulaw\nendpoint/rtp_symmetric = yes\nendpoint/rewrite_contact = yes\nendpoint/rtp_timeout = 60\nendpoint/use_ptime = yes\nendpoint/moh_suggest = default\nendpoint/direct_media = no\nendpoint/trust_id_inbound = yes\nendpoint/send_rpid = yes\nendpoint/inband_progress = no\nendpoint/tos_audio = ef\nendpoint/language = en', 'PJSIP_WIZ',
+         'WIZTRK=ExamplePJSIPWIZ',
+         'exten => _91999NXXXXXX,1,AGI(agi://127.0.0.1:4577/call_log)\nexten => _91999NXXXXXX,n,Dial(PJSIP/${EXTEN:1}@${WIZTRK},${CAMPDTO},To)\nexten => _91999NXXXXXX,n,Hangup()',
+         '0.0.0.0', 'N', 'A PJSIP_WIZ example carrier using IP authentication', '---ALL---'
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_server_carriers);
+
 /*!40000 ALTER TABLE `vicidial_server_carriers` ENABLE KEYS */;
 
 --
@@ -10110,31 +10160,54 @@ CREATE TABLE IF NOT EXISTS `vicidial_state_call_times` (
 /*!40000 ALTER TABLE `vicidial_state_call_times` DISABLE KEYS */;
 INSERT INTO `vicidial_state_call_times` 
 (state_call_time_id, state_call_time_state, state_call_time_name, state_call_time_comments, sct_default_start, sct_default_stop, sct_sunday_start, sct_sunday_stop, sct_monday_start, sct_monday_stop, sct_tuesday_start, sct_tuesday_stop, sct_wednesday_start, sct_wednesday_stop, sct_thursday_start, sct_thursday_stop, sct_friday_start, sct_friday_stop, sct_saturday_start, sct_saturday_stop, user_group, ct_holidays, modify_stamp)
-SELECT * FROM (
-    VALUES 
-    ROW('alabama','AL','Alabama 8am-8pm and Sunday','',800,2000,2400,2400,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('florida','FL','Florida 8am 8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('illinois','IL','Illinois 8am','',800,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('indiana','IN','Indiana 8pm restriction','',900,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('kentucky','KY','Kentucky 10am restriction','',1000,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('louisiana','LA','Louisiana 8am-8pm and Sunday','',800,2000,2400,2400,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('maine','ME','Maine 9am-5pm','',900,1700,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('maryland','MD','Maryland 8am 8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('massachuse','MA','Massachusetts 8am-8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('mississipp','MS','Mississippi 8am-8pm and Sunday','',800,2000,2400,2400,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('nebraska','NE','Nebraska 8am','',800,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('nevada','NV','Nevada 8pm restriction','',900,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('oklahoma','OK','Oklahoma 8am 8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('pennsylvan','PA','Pennsylvania sunday restrictn','',900,2100,1330,2100,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('rhodeislan','RI','Rhode Island restrictions','',900,1800,2400,2400,0,0,0,0,0,0,0,0,0,0,1000,1700,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('sdakota','SD','South Dakota sunday restrict','',900,2100,2400,2400,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('tennessee','TN','Tennessee 8am','',800,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('texas','TX','Texas sunday restriction','',900,2100,1200,2100,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('utah','UT','Utah 8pm restriction','',900,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('washington','WA','Washington 8am-8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'),
-    ROW('wyoming','WY','Wyoming 8am-8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09')
-) as data(state_call_time_id, state_call_time_state, state_call_time_name, state_call_time_comments, sct_default_start, sct_default_stop, sct_sunday_start, sct_sunday_stop, sct_monday_start, sct_monday_stop, sct_tuesday_start, sct_tuesday_stop, sct_wednesday_start, sct_wednesday_stop, sct_thursday_start, sct_thursday_stop, sct_friday_start, sct_friday_stop, sct_saturday_start, sct_saturday_stop, user_group, ct_holidays, modify_stamp)
+SELECT state_call_time_id, state_call_time_state, state_call_time_name, state_call_time_comments, sct_default_start, sct_default_stop, sct_sunday_start, sct_sunday_stop, sct_monday_start, sct_monday_stop, sct_tuesday_start, sct_tuesday_stop, sct_wednesday_start, sct_wednesday_stop, sct_thursday_start, sct_thursday_stop, sct_friday_start, sct_friday_stop, sct_saturday_start, sct_saturday_stop, user_group, ct_holidays, modify_stamp FROM (
+  SELECT 'alabama' AS state_call_time_id, 'AL' AS state_call_time_state, 'Alabama 8am-8pm and Sunday' AS state_call_time_name, '' AS state_call_time_comments,
+         800 AS sct_default_start, 2000 AS sct_default_stop, 2400 AS sct_sunday_start, 2400 AS sct_sunday_stop, 0 AS sct_monday_start, 0 AS sct_monday_stop,
+         0 AS sct_tuesday_start, 0 AS sct_tuesday_stop, 0 AS sct_wednesday_start, 0 AS sct_wednesday_stop, 0 AS sct_thursday_start, 0 AS sct_thursday_stop,
+         0 AS sct_friday_start, 0 AS sct_friday_stop, 0 AS sct_saturday_start, 0 AS sct_saturday_stop, '---ALL---' AS user_group, NULL AS ct_holidays, '2025-06-23 16:43:09' AS modify_stamp
+  UNION ALL
+  SELECT 'florida','FL','Florida 8am 8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'illinois','IL','Illinois 8am','',800,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'indiana','IN','Indiana 8pm restriction','',900,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'kentucky','KY','Kentucky 10am restriction','',1000,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'louisiana','LA','Louisiana 8am-8pm and Sunday','',800,2000,2400,2400,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'maine','ME','Maine 9am-5pm','',900,1700,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'maryland','MD','Maryland 8am 8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'massachuse','MA','Massachusetts 8am-8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'mississipp','MS','Mississippi 8am-8pm and Sunday','',800,2000,2400,2400,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'nebraska','NE','Nebraska 8am','',800,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'nevada','NV','Nevada 8pm restriction','',900,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'oklahoma','OK','Oklahoma 8am 8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'pennsylvan','PA','Pennsylvania sunday restrictn','',900,2100,1330,2100,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'rhodeislan','RI','Rhode Island restrictions','',900,1800,2400,2400,0,0,0,0,0,0,0,0,0,0,1000,1700,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'sdakota','SD','South Dakota sunday restrict','',900,2100,2400,2400,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'tennessee','TN','Tennessee 8am','',800,2100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'texas','TX','Texas sunday restriction','',900,2100,1200,2100,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'utah','UT','Utah 8pm restriction','',900,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'washington','WA','Washington 8am-8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+  UNION ALL
+  SELECT 'wyoming','WY','Wyoming 8am-8pm','',800,2000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'---ALL---',NULL,'2025-06-23 16:43:09'
+) AS data
 WHERE NOT EXISTS (SELECT 1 FROM vicidial_state_call_times);
+
 /*!40000 ALTER TABLE `vicidial_state_call_times` ENABLE KEYS */;
 
 --
@@ -11393,30 +11466,50 @@ CREATE TABLE IF NOT EXISTS `wallboard_widgets` (
 /*!40000 ALTER TABLE `wallboard_widgets` DISABLE KEYS */;
 INSERT INTO `wallboard_widgets` 
 (widget_id, wallboard_report_id, view_id, widget_title, widget_type, widget_width, widget_is_row, widget_rowspan, widget_text, widget_queue, widget_sla_level, widget_agent, widget_color, widget_color2, widget_alarms, widget_order)
-SELECT * FROM (
-    VALUES 
-    ROW('queues_widget_1','AGENTS_AND_QUEUES','queues','','TEXT',5,'N',1,'Queue Information','','',NULL,'','',NULL,2),
-    ROW('queues_widget_0','AGENTS_AND_QUEUES','queues','','LOGO',2,'N',1,NULL,'','',NULL,'','',NULL,1),
-    ROW('queues_widget_2','AGENTS_AND_QUEUES','queues','SLA Level %','SLA_LEVEL_PCT',1,'N',1,NULL,'','>60',NULL,'','',NULL,3),
-    ROW('queues_widget_3','AGENTS_AND_QUEUES','queues','Outbound calls','LIVE_QUEUE_INFO',1,'N',1,'','201201','','','','','yellow_alarm,|red_alarm,',4),
-    ROW('queues_widget_4','AGENTS_AND_QUEUES','queues','USA Ded Inbound','LIVE_QUEUE_INFO',1,'N',1,'','ALL_IN','','','','','yellow_alarm,|red_alarm,',5),
-    ROW('queues_widget_5','AGENTS_AND_QUEUES','queues','MLA Ded Inbound','LIVE_QUEUE_INFO',1,'N',1,'','514911','','','','','yellow_alarm,|red_alarm,',6),
-    ROW('queues_widget_6','AGENTS_AND_QUEUES','queues','N Waiting Calls','N_WAITING_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,7),
-    ROW('queues_widget_7','AGENTS_AND_QUEUES','queues','Offered Calls','OFFERED_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,8),
-    ROW('queues_widget_8','AGENTS_AND_QUEUES','queues','Answered Calls','ANSWERED_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,9),
-    ROW('queues_widget_9','AGENTS_AND_QUEUES','queues','Lost Calls','LOST_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,10),
-    ROW('queues_widget_10','AGENTS_AND_QUEUES','queues','Longest Wait','LONGEST_WAIT',1,'N',1,NULL,'','',NULL,'','',NULL,11),
-    ROW('queues_widget_11','AGENTS_AND_QUEUES','queues','Live Queues','LIVE_QUEUES',1,'Y',1,NULL,'','',NULL,'','',NULL,12),
-    ROW('queues_widget_12','AGENTS_AND_QUEUES','queues','Live Calls','LIVE_CALLS',1,'Y',2,NULL,'','',NULL,'','',NULL,13),
-    ROW('agent_widget_0','AGENTS_AND_QUEUES','agents','','LOGO',2,'N',1,NULL,'','',NULL,'','',NULL,1),
-    ROW('agent_widget_1','AGENTS_AND_QUEUES','agents','N Waiting Calls','N_WAITING_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,2),
-    ROW('agent_widget_2','AGENTS_AND_QUEUES','agents','Agents Ready','AGENTS_READY',1,'N',1,NULL,'','',NULL,'','',NULL,3),
-    ROW('agent_widget_3','AGENTS_AND_QUEUES','agents','Agents On Call','N_AGENTS_ON_CALL',1,'N',1,NULL,'','',NULL,'','',NULL,4),
-    ROW('agent_widget_4','AGENTS_AND_QUEUES','agents','N Answered Calls','N_ANSWERED_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,5),
-    ROW('agent_widget_5','AGENTS_AND_QUEUES','agents','Clock','CLOCK',1,'N',1,NULL,'','',NULL,'','',NULL,6),
-    ROW('agent_widget_6','AGENTS_AND_QUEUES','agents','Live Agents','LIVE_AGENTS',1,'Y',3,NULL,'','',NULL,'','',NULL,7)
-) as data(widget_id, wallboard_report_id, view_id, widget_title, widget_type, widget_width, widget_is_row, widget_rowspan, widget_text, widget_queue, widget_sla_level, widget_agent, widget_color, widget_color2, widget_alarms, widget_order)
-WHERE NOT EXISTS (SELECT 1 FROM wallboard_widgets);/*!40000 ALTER TABLE `wallboard_widgets` ENABLE KEYS */;
+SELECT widget_id, wallboard_report_id, view_id, widget_title, widget_type, widget_width, widget_is_row, widget_rowspan, widget_text, widget_queue, widget_sla_level, widget_agent, widget_color, widget_color2, widget_alarms, widget_order FROM (
+  SELECT 'queues_widget_1' AS widget_id, 'AGENTS_AND_QUEUES' AS wallboard_report_id, 'queues' AS view_id, '' AS widget_title, 'TEXT' AS widget_type, 5 AS widget_width, 'N' AS widget_is_row, 1 AS widget_rowspan, 'Queue Information' AS widget_text, '' AS widget_queue, '' AS widget_sla_level, NULL AS widget_agent, '' AS widget_color, '' AS widget_color2, NULL AS widget_alarms, 2 AS widget_order
+  UNION ALL
+  SELECT 'queues_widget_0','AGENTS_AND_QUEUES','queues','','LOGO',2,'N',1,NULL,'','',NULL,'','',NULL,1
+  UNION ALL
+  SELECT 'queues_widget_2','AGENTS_AND_QUEUES','queues','SLA Level %','SLA_LEVEL_PCT',1,'N',1,NULL,'','>60',NULL,'','',NULL,3
+  UNION ALL
+  SELECT 'queues_widget_3','AGENTS_AND_QUEUES','queues','Outbound calls','LIVE_QUEUE_INFO',1,'N',1,'','201201','','','','','yellow_alarm,|red_alarm,',4
+  UNION ALL
+  SELECT 'queues_widget_4','AGENTS_AND_QUEUES','queues','USA Ded Inbound','LIVE_QUEUE_INFO',1,'N',1,'','ALL_IN','','','','','yellow_alarm,|red_alarm,',5
+  UNION ALL
+  SELECT 'queues_widget_5','AGENTS_AND_QUEUES','queues','MLA Ded Inbound','LIVE_QUEUE_INFO',1,'N',1,'','514911','','','','','yellow_alarm,|red_alarm,',6
+  UNION ALL
+  SELECT 'queues_widget_6','AGENTS_AND_QUEUES','queues','N Waiting Calls','N_WAITING_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,7
+  UNION ALL
+  SELECT 'queues_widget_7','AGENTS_AND_QUEUES','queues','Offered Calls','OFFERED_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,8
+  UNION ALL
+  SELECT 'queues_widget_8','AGENTS_AND_QUEUES','queues','Answered Calls','ANSWERED_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,9
+  UNION ALL
+  SELECT 'queues_widget_9','AGENTS_AND_QUEUES','queues','Lost Calls','LOST_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,10
+  UNION ALL
+  SELECT 'queues_widget_10','AGENTS_AND_QUEUES','queues','Longest Wait','LONGEST_WAIT',1,'N',1,NULL,'','',NULL,'','',NULL,11
+  UNION ALL
+  SELECT 'queues_widget_11','AGENTS_AND_QUEUES','queues','Live Queues','LIVE_QUEUES',1,'Y',1,NULL,'','',NULL,'','',NULL,12
+  UNION ALL
+  SELECT 'queues_widget_12','AGENTS_AND_QUEUES','queues','Live Calls','LIVE_CALLS',1,'Y',2,NULL,'','',NULL,'','',NULL,13
+  UNION ALL
+  SELECT 'agent_widget_0','AGENTS_AND_QUEUES','agents','','LOGO',2,'N',1,NULL,'','',NULL,'','',NULL,1
+  UNION ALL
+  SELECT 'agent_widget_1','AGENTS_AND_QUEUES','agents','N Waiting Calls','N_WAITING_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,2
+  UNION ALL
+  SELECT 'agent_widget_2','AGENTS_AND_QUEUES','agents','Agents Ready','AGENTS_READY',1,'N',1,NULL,'','',NULL,'','',NULL,3
+  UNION ALL
+  SELECT 'agent_widget_3','AGENTS_AND_QUEUES','agents','Agents On Call','N_AGENTS_ON_CALL',1,'N',1,NULL,'','',NULL,'','',NULL,4
+  UNION ALL
+  SELECT 'agent_widget_4','AGENTS_AND_QUEUES','agents','N Answered Calls','N_ANSWERED_CALLS',1,'N',1,NULL,'','',NULL,'','',NULL,5
+  UNION ALL
+  SELECT 'agent_widget_5','AGENTS_AND_QUEUES','agents','Clock','CLOCK',1,'N',1,NULL,'','',NULL,'','',NULL,6
+  UNION ALL
+  SELECT 'agent_widget_6','AGENTS_AND_QUEUES','agents','Live Agents','LIVE_AGENTS',1,'Y',3,NULL,'','',NULL,'','',NULL,7
+) AS data
+WHERE NOT EXISTS (SELECT 1 FROM wallboard_widgets);
+
+/*!40000 ALTER TABLE `wallboard_widgets` ENABLE KEYS */;
 
 --
 -- Table structure for table `web_client_sessions`

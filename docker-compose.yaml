@@ -4,7 +4,7 @@ services:
     container_name: vicidial-db
     build:
       context: './docker/mysql'
-      dockerfile: 'Dockerfile.mysql8'
+      dockerfile: 'Dockerfile.mariadb'
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-S", "/tmp/mysql.sock"]
@@ -12,8 +12,8 @@ services:
       timeout: 5s
       retries: 2
       start_period: 20s
-    ports:
-      - "127.0.0.1:3306:3306"
+    # ports:
+    #   - "127.0.0.1:3306:3306"
     env_file:
       - './docker/mysql/mysql.env'
     networks:
@@ -51,11 +51,13 @@ services:
     networks:
       backend:
         ipv4_address: 10.10.10.15
+      frontend:
+
 
     ports:
-      - "127.0.0.1:8080:80"
-      - "127.0.0.1:5060:5060"
-      # - "127.0.0.1:10000-50000:10000-50000"
+      - "8080:80"
+      - "5060:5060"
+      - "4569:4569"
 
     # use to bind host to all ports
     # network_mode: host
@@ -76,13 +78,18 @@ services:
 
 networks:
   backend:
-    name: vici-net
+    name: vici-backend
     driver: bridge
+    internal: true
     # Set internal subnet
     ipam:
       driver: default
       config:
         - subnet: 10.10.10.0/24
+
+  frontend:
+    name: vici-frontend
+    driver: bridge
  
 # Volumes needed for mariadb persistency
 volumes:
