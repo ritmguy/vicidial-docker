@@ -78,6 +78,7 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
 
 ## 📁 Directory Structure (Expected)
 
+```plaintext
 .
 ├── docker
 │   ├── app
@@ -91,11 +92,12 @@ This project provides a Docker-based setup for running a self-hosted [Vicidial](
 │           ├── certs/
 │           └── data/
 └── docker-compose.yml
+```
 
 ## 🛠 Troubleshooting
 
-Stuck containers: Try docker compose down -v && docker compose up --build
-Database socket errors: Ensure /tmp/mysql.sock is correctly referenced in config and healthcheck
+Stuck containers: Try ```bash docker compose down -v && docker compose up --build```
+Database socket errors: Ensure `/tmp/mysql.sock` is correctly referenced in `config` and `healthcheck`
 SIP/RTP issues: Open required ports or use host networking if needed
 ## 📜 License
 
