@@ -15,14 +15,16 @@ services:
 
     env_file:
       - './docker/mysql/mysql.env'
-    networks:
-      backend:
-        ipv4_address: 10.10.10.10
 
+    network_mode: host
+
+    # networks:
+    #   backend:
+    #     ipv4_address: 10.10.10.10
+    
     # ports:
-    #   - "127.0.0.1:3306:3306"
+    #   - "3306:3306" 
 
-    # network_mode: host
     volumes:
       - db_data:/var/lib/mysql
       - db_log:/var/log/mysql
@@ -34,9 +36,44 @@ services:
     build:
       context: './docker/app'
       args:
-        - VICI_DB=10.10.10.10
-        - VICI_HOST=10.10.10.15
+        - VICI_DB=127.0.0.1
+        - VICI_HOST="${LOCAL_IP}"
+        - VICI_EXT_IP="${LOCAL_IP}"
       dockerfile: 'Dockerfile.ubuntu'
+
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: 'service_healthy'
+    
+    network_mode: host
+
+
+    # networks:
+    #   backend:
+    #     ipv4_address: 10.10.10.15
+    #   frontend:
+
+    # ports:
+      # - "80:80"
+      # - "443:443"
+      # - "5060:5060" # SIP phone
+      # - "4569:4569" # IAX phones
+      # - "8089:8089" # WebRTC phones
+      # - "10000-10010:10000-10010/udp" # RTP streams for phones (may or may not be needed)
+
+
+  web:
+    container_name: vicidial-web
+    build:
+      context: './docker/app'
+      args:
+        - VICI_DB=127.0.0.1
+        - VICI_HOST="${LOCAL_IP}"
+        - VICI_EXT_IP="${LOCAL_IP}"
+        - VICI_WEB_HOST=true
+      dockerfile: 'Dockerfile.ubuntu'
+
 
     restart: unless-stopped
     depends_on:
@@ -44,45 +81,45 @@ services:
         condition: 'service_healthy'
       # certbot:
       #   condition: 'service_completed_successfully'
+
+
+    network_mode: host
+
+    # networks:
+    #   backend:
+    #     ipv4_address: 10.10.10.20
+    #   frontend:
+
+    # ports:
+    #   - "80:80"
+    #   - "443:443"
     
     volumes:
       - /var/www/html
       - ./docker/certbot/letsencrypt/certs:/etc/letsencrypt
       - ./docker/certbot/letsencrypt/data:/var/lib/letsencrypt
 
-    networks:
-      backend:
-        ipv4_address: 10.10.10.15
-      frontend:
-
-
-    ports:
-      - "8080:80"
-      - "5060:5060"
-      - "4569:4569"
-
-    # use to bind host to all ports
-    # network_mode: host
 
     # comment the following line in production, it allows to have nice human-readable logs in dev
-    # tty: true
+    tty: true
 
   # certbot:
   #   image: certbot/certbot
   #   volumes_from:
-  #     - app
+  #     - web
 
   #   # set the domain & email for certbot here
-  #   command: certonly --keep-until-expiring --standalone --email test@test.com --agree-tos --no-eff-email -d test@test.com
+  #   command: certonly --keep-until-expiring --standalone --email test@test.com --agree-tos --no-eff-email -d vici-dev.protect247.app
 
   #   # set proper network_mode to bind port 80 and get certificate before webserver starts
   #   network_mode: host
 
+
 networks:
   backend:
-    name: vici-backend
+    name: vici-net
     driver: bridge
-    internal: true
+    # internal: true
     # Set internal subnet
     ipam:
       driver: default
@@ -92,6 +129,7 @@ networks:
   frontend:
     name: vici-frontend
     driver: bridge
+ 
  
 # Volumes needed for mariadb persistency
 volumes:

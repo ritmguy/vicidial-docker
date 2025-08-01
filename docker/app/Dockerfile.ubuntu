@@ -3,6 +3,8 @@ FROM ubuntu:22.04 AS final
 
 ARG VICI_DB
 ARG VICI_HOST
+ARG VICI_EXT_IP
+ARG VICI_WEB_HOST
 ENV DEBIAN_FRONTEND=noninteractive
 
 ## Set time on server - UTC, America/New_York, etc...
@@ -19,6 +21,7 @@ RUN apt-get update -y && apt-get upgrade -y && \
     cron \
     unzip \
     zip \
+    ntpdate \
     build-essential \
     libcurl4-openssl-dev \
     libzip-dev \
@@ -70,15 +73,10 @@ RUN apt-get update -y && apt-get upgrade -y && \
 
 ## CPAN installs
 RUN cpan -i CPAN::Meta::Requirements \
-Digest::MD5 \
-    Digest::SHA1 \  
+    Digest::MD5 \
+    Digest::SHA1 \
     CPAN && \
     cpan reload CPAN
-
-# RUN cpan -i Digest::MD5 \
-#     Digest::SHA1 \
-#     Bundle::CPAN && \
-#     cpan reload CPAN
 
 RUN cpan force install Time::HiRes Switch
 
@@ -102,74 +100,83 @@ RUN add-apt-repository -y   ppa:ondrej/php && apt-get update  && \
         php7.4-curl \
         php7.4-xml \
         php7.4-mbstring
+## Vicidial code downlaod
+RUN mkdir -p /usr/src/astguiclient && \
+    cd /usr/src/astguiclient && \
+    svn checkout svn://svn.eflo.net/agc_2-X/trunk && \
+    cd trunk
 
+COPY --chmod=0644 --chown=root:root crontab /etc/cron.d/vici_cron
+RUN crontab /etc/cron.d/vici_cron
 
-
-## Asterisk install - Vicidial-specific asterisk version - http://download.vicidial.com
-RUN cd /usr/src && \
+## Separate installs for "web-only" service and dialer
+RUN if [ "$VICI_WEB_HOST" = "true" ]; then \
+    cd /usr/src/astguiclient/trunk && perl install.pl \
+        --no-prompt \
+        --server_ip=${VICI_HOST} \
+        --web=/var/www/html \
+        --DB_server=${VICI_DB} \
+        --web-only; \
+    else \
+    ## Asterisk install - Vicidial-specific asterisk version - http://download.vicidial.com
+    cd /usr/src && \
     wget http://download.vicidial.com/required-apps/asterisk-18.21.0-vici.tar.gz && \
     tar -xvzf asterisk-18.21.0-vici.tar.gz && \
     cd asterisk-18.21.0-vici/ && \
     ./contrib/scripts/install_prereq install && \
-    ./bootstrap.sh
-
-## Compile asterisk
-WORKDIR /usr/src/asterisk-18.21.0-vici
-RUN ./configure \
-    --libdir=/usr/lib \
-    --with-gsm=internal \
-    --enable-opus \
-    --enable-srtp \
-    --with-ssl \
-    --enable-asteriskssl \
-    --with-pjproject-bundled \
-    --with-jansson-bundled \
-    --with-ogg=/usr/lib
-
-## Make options and make asterisk
-RUN make menuselect/menuselect menuselect-tree menuselect.makeopts && \
+    ./bootstrap.sh && \
+    ## Compile asterisk
+    cd /usr/src/asterisk-18.21.0-vici && \
+    ./configure \
+        --libdir=/usr/local/lib \
+        --with-astmoddir=/var/lib \
+        --with-gsm=internal \
+        --enable-opus \
+        --enable-srtp \
+        --with-ssl \
+        --enable-asteriskssl \
+        --with-pjproject-bundled \
+        --with-jansson-bundled \
+        --with-ogg=/usr/lib \
+    ## Make options and make asterisk
+    && make menuselect/menuselect menuselect-tree menuselect.makeopts && \
     menuselect/menuselect --enable app_meetme menuselect.makeopts && \
     menuselect/menuselect --enable res_http_websocket menuselect.makeopts && \
     menuselect/menuselect --enable res_srtp menuselect.makeopts && \
     make -j$(nproc) && \
     make all && make install && \
-    sed -i 's|noload = chan_sip.so|;noload = chan_sip.so|g' /etc/asterisk/modules.conf
-
-## Post-Asterisk installs
-RUN apt-get update -y \
-    && apt-get install -y \
-    libelf-dev \
-    autogen \
-    libtool \
-    shtool \
-    libc6-dev
-
-
-## Vicidial code downlaod
-RUN mkdir -p /usr/src/astguiclient && \
-    cd /usr/src/astguiclient && \
-    svn checkout svn://svn.eflo.net/agc_2-X/trunk && \
-    ## Install script - change opts as needed
-    cd trunk/ && perl install.pl \
+    sed -i 's|noload = chan_sip.so|;noload = chan_sip.so|g' /etc/asterisk/modules.conf && \
+    ## Post-Asterisk installs
+    apt-get update -y \
+        && apt-get install -y \
+        libelf-dev \
+        autogen \
+        libtool \
+        shtool \
+        libc6-dev && \
+    cd /usr/src/astguiclient/trunk && \
+    perl install.pl \
         --no-prompt \
         --server_ip=${VICI_HOST} \
-        --web=/var/www/html \
+        --without-web \
         --DB_server=${VICI_DB} \
-        --active_keepalives=1234568 \
-        --khomp-enable
+        --active_keepalives=1234568CS \
+        --khomp-enable; \
+    fi
 
-## Copy vicidial custom crontab & supervisor conf files into the container
-COPY --chmod=0644 crontab /etc/cron.d/vici_cron
+## Copy vicidial custom supervisor, apache2, & vicidial conf files into the container
 COPY supervisord.conf /etc/supervisor/conf.d/
 COPY start_asterisk_boot.pl /usr/share/astguiclient/
-COPY --chmod=0644 ./apache2/html/* /var/www/html/
+RUN chmod +x /usr/share/astguiclient/*.pl
+COPY ./apache2/html/* /var/www/html/
 COPY --chmod=0666 ./asterisk-conf/* /etc/asterisk/
+
 
 ## For running SSL - certbot container must get certs prior
 # COPY ./apache2/conf/*.conf /etc/apache2/sites-available
 # RUN a2enmod ssl && a2ensite default-ssl
 
+EXPOSE 80 443 5060/tcp 5060/udp 10000-20000/udp 4569/udp 8089/tcp
 
-EXPOSE 80 443 5060/tcp 5061/udp 10000-20000/udp 4569/udp
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
