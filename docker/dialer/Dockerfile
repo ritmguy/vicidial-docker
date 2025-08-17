@@ -109,17 +109,9 @@ RUN mkdir -p /usr/src/astguiclient && \
 COPY --chmod=0644 --chown=root:root crontab /etc/cron.d/vici_cron
 RUN crontab /etc/cron.d/vici_cron
 
-## Separate installs for "web-only" service and dialer
-RUN if [ "$VICI_WEB_HOST" = "true" ]; then \
-    cd /usr/src/astguiclient/trunk && perl install.pl \
-        --no-prompt \
-        --server_ip=${VICI_HOST} \
-        --web=/var/www/html \
-        --DB_server=${VICI_DB} \
-        --web-only; \
-    else \
-    ## Asterisk install - Vicidial-specific asterisk version - http://download.vicidial.com
-    cd /usr/src && \
+
+## Asterisk install - Vicidial-specific asterisk version - http://download.vicidial.com
+RUN cd /usr/src && \
     wget http://download.vicidial.com/required-apps/asterisk-18.21.0-vici.tar.gz && \
     tar -xvzf asterisk-18.21.0-vici.tar.gz && \
     cd asterisk-18.21.0-vici/ && \
@@ -161,14 +153,13 @@ RUN if [ "$VICI_WEB_HOST" = "true" ]; then \
         --without-web \
         --DB_server=${VICI_DB} \
         --active_keepalives=1234568CS \
-        --khomp-enable; \
-    fi
+        --khomp-enable
+
 
 ## Copy vicidial custom supervisor, apache2, & vicidial conf files into the container
 COPY supervisord.conf /etc/supervisor/conf.d/
 COPY start_asterisk_boot.pl /usr/share/astguiclient/
 RUN chmod +x /usr/share/astguiclient/*.pl
-COPY ./apache2/html/* /var/www/html/
 COPY --chmod=0666 ./asterisk-conf/* /etc/asterisk/
 
 
@@ -176,7 +167,7 @@ COPY --chmod=0666 ./asterisk-conf/* /etc/asterisk/
 # COPY ./apache2/conf/*.conf /etc/apache2/sites-available
 # RUN a2enmod ssl && a2ensite default-ssl
 
-EXPOSE 80 443 5060/tcp 5060/udp 10000-20000/udp 4569/udp 8089/tcp
+EXPOSE 5060/tcp 5060/udp 10000-20000/udp 4569/udp 8089/tcp
 
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

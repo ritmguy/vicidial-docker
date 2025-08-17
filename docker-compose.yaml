@@ -34,12 +34,12 @@ services:
 
     container_name: vicidial-dialer
     build:
-      context: './docker/app'
+      context: './docker/dialer'
       args:
         - VICI_DB=127.0.0.1
         - VICI_HOST="${LOCAL_IP}"
         - VICI_EXT_IP="${LOCAL_IP}"
-      dockerfile: 'Dockerfile.ubuntu'
+      dockerfile: 'Dockerfile'
 
     restart: unless-stopped
     depends_on:
@@ -66,13 +66,13 @@ services:
   web:
     container_name: vicidial-web
     build:
-      context: './docker/app'
+      context: './docker/web'
       args:
         - VICI_DB=127.0.0.1
         - VICI_HOST="${LOCAL_IP}"
         - VICI_EXT_IP="${LOCAL_IP}"
         - VICI_WEB_HOST=true
-      dockerfile: 'Dockerfile.ubuntu'
+      dockerfile: 'Dockerfile'
 
 
     restart: unless-stopped
