@@ -92,6 +92,21 @@ services:
   #   # set proper network_mode to bind port 80 and get certificate before webserver starts
   #   network_mode: host
  
+# networks:
+#   backend:
+#     name: vici-backend
+#     driver: bridge
+#     internal: true
+#     # Set internal subnet
+#     ipam:
+#       driver: default
+#       config:
+#         - subnet: 10.10.10.0/24
+
+#   frontend:
+#     name: vici-frontend
+#     driver: bridge
+
  
 # Volumes needed for mariadb persistency
 volumes:
