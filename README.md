@@ -1,107 +1,230 @@
-# Vicidial in Docker
+# VICIdial Docker Compose Setup
 
-This project provides a Docker-based setup for running a self-hosted [Vicidial](http://www.vicidial.org/) call center solution. It uses multiple containers to separate concerns, including a MariaDB backend and a dialer application container. Optional support for Let's Encrypt certificates via Certbot is included (commented out for now).
+A containerized deployment of VICIdial (Vicidial Internet Contact Center) using Docker Compose with MariaDB, web interface, and dialer components.
 
----
+## Overview
 
-## ![headset](https://img.icons8.com/lollipop/48/headset.png) Vicidial Services
+This Docker Compose configuration sets up a complete VICIdial environment with the following services:
 
-### `db` - MariaDB Database
-- **Container Name:** `vicidial-db`
-- **Dockerfile:** `./docker/mysql/Dockerfile.mariadb`
-- **Environment Variables:** Loaded from `./docker/mysql/mysql.env`
-- **Volumes:**
-  - Persistent DB data: `db_data:/var/lib/mysql`
-  - DB logs: `db_log:/var/log/mysql`
-  - SQL import files: `./docker/mysql/import:/var/lib/mysql-files`
-- **Healthcheck:** Uses `mysqladmin ping` on socket `/tmp/mysql.sock`
-- **Networks:** 
-  - `vici-backend` (IP: `10.10.10.10`)
-- **Restart Policy:** `unless-stopped`
+- **Database (MariaDB)**: Primary database server for VICIdial
+- **Dialer**: VICIdial dialer service for automated calling
+- **Web**: Web interface for VICIdial administration and agent interface
 
----
+## Architecture
 
-### `dialer` - Vicidial Application (web server & dialer)
-- **Container Name:** `vicidial-dialer`
-- **Dockerfile:** `./docker/app/Dockerfile.ubuntu`
-- **Build Args:**
-  - `VICI_DB=10.10.10.10`
-  - `VICI_HOST=10.10.10.15`
-- **Volumes:**
-  - Web content: `/var/www/html`
-  - SSL Certs: 
-    - `./docker/certbot/letsencrypt/certs:/etc/letsencrypt`
-    - `./docker/certbot/letsencrypt/data:/var/lib/letsencrypt`
-- **Ports Exposed:**
-  - HTTP: `8080:80`
-  - SIP: `5060:5060`
-  - IAX2: `4569:4569`
-- **Networks:**
-  - `vici-backend` (IP: `10.10.10.15`)
-  - `vici-frontend`
-- **Depends On:** Waits for healthy `db`
+```
+┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+│   Web UI    │    │   Dialer     │    │  Database   │
+│ (vicidial-  │    │ (vicidial-   │    │ (vicidial-  │
+│    web)     │    │   dialer)    │    │     db)     │
+└─────────────┘    └──────────────┘    └─────────────┘
+       │                   │                   │
+       └───────────────────┼───────────────────┘
+                          │
+                   Host Network Mode
+```
 
----
+## Prerequisites
 
-### (Optional) `certbot` - Let's Encrypt SSL Generation
-*Currently commented out.*
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- Minimum 4GB RAM
+- Minimum 20GB disk space
 
-- **Image:** `certbot/certbot`
-- **Volumes:** Inherits from `dialer`
-- **Command:**
-  ```bash
-  certonly --keep-until-expiring --standalone \
-    --email test@test.com --agree-tos \
-    --no-eff-email -d vici-dev.protect247.app
+## Environment Setup
 
-## 🌐 Networks
+1. **Clone the repository** and navigate to the project directory
 
-- **vici-backend**  
-  Bridge network  
-  Internal (no outbound internet access)  
-  Subnet: `10.10.10.0/24`
+2. **Set up environment variables**:
 
-- **vici-frontend**  
-  Bridge network for web/public interfaces
-
-## 💾 Volumes
-
-- `db_data` — Persistent MariaDB data  
-- `db_log` — MariaDB logs
-
-## 🚀 Usage
-
-1. Clone the repository  
-2. Ensure your environment files are correctly populated (e.g., `./docker/mysql/mysql.env`)  
-3. Build and start the services:  
    ```bash
-   docker compose up -d --build
+   export LOCAL_IP=your.server.ip.address
+   ```
 
-## 📁 Directory Structure (Expected)
+   Replace `your.server.ip.address` with your actual server IP address.
 
-```plaintext
+3. **Configure MySQL environment**:
+   Edit `./docker/mysql/mysql.env` with your database configuration.
+
+## Directory Structure
+
+```
 .
-├── docker
-│   ├── app
-│   │   └── Dockerfile.ubuntu
-│   ├── mysql
+├── docker-compose.yaml
+├── docker/
+│   ├── mysql/
 │   │   ├── Dockerfile.mariadb
 │   │   ├── mysql.env
-│   │   └── import/
-│   └── certbot
+│   │   └── import/          # MySQL import files
+│   ├── dialer/
+│   │   └── Dockerfile
+│   ├── web/
+│   │   └── Dockerfile
+│   └── certbot/
 │       └── letsencrypt/
 │           ├── certs/
 │           └── data/
-└── docker-compose.yml
 ```
 
-## 🛠 Troubleshooting
+## Services Configuration
 
-Stuck containers: Try ```bash docker compose down -v && docker compose up --build```
+### Database Service (db)
 
-Database socket errors: Ensure `/tmp/mysql.sock` is correctly referenced in `config` and `healthcheck`
+- **Container**: `vicidial-db`
+- **Image**: Custom MariaDB build
+- **Health Check**: MySQL ping on socket `/tmp/mysql.sock`
+- **Volumes**:
+  - `db_data`: Database files persistence
+  - `db_log`: Database logs
+  - `./docker/mysql/import`: Import directory for SQL files
+- **Network**: Host mode
 
-SIP/RTP issues: Open required ports or use host networking if needed
-## 📜 License
+### Dialer Service (dialer)
 
-This project is provided as-is, under the terms of the MIT License.
+- **Container**: `vicidial-dialer`
+- **Dependencies**: Database service (healthy)
+- **Build Args**:
+  - `VICI_DB=127.0.0.1`
+  - `VICI_HOST=${LOCAL_IP}`
+  - `VICI_EXT_IP=${LOCAL_IP}`
+- **Network**: Host mode
+
+### Web Service (web)
+
+- **Container**: `vicidial-web`
+- **Dependencies**: Database service (healthy)
+- **Build Args**:
+  - `VICI_DB=127.0.0.1`
+  - `VICI_HOST=${LOCAL_IP}`
+  - `VICI_EXT_IP=${LOCAL_IP}`
+  - `VICI_WEB_HOST=true`
+- **Volumes**:
+  - `/var/www/html`: Web files
+  - SSL certificates (Let's Encrypt)
+- **Network**: Host mode
+
+## Installation & Usage
+
+### 1. Start the Services
+
+```bash
+# Build and start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f web
+docker-compose logs -f dialer
+docker-compose logs -f db
+```
+
+### 2. Check Service Status
+
+```bash
+# Check running containers
+docker-compose ps
+
+# Check database health
+docker-compose exec db mysqladmin ping -h localhost -S /tmp/mysql.sock
+```
+
+### 3. Access the Application
+
+- **Web Interface**: `http://your-server-ip/vicidial/admin.php`
+- **Agent Interface**: `http://your-server-ip/agc/vicidial.php`
+
+## Important Notes
+
+### Network Configuration
+
+- All services use **host network mode** for direct access to host networking
+- This bypasses Docker's internal networking and uses the host's network stack directly
+- Commented port mappings are available if you prefer bridge networking
+
+### SSL/TLS Support
+
+- SSL certificate support via Let's Encrypt (currently commented out)
+- Uncomment the `certbot` service for automatic SSL certificate generation
+- Update email and domain in the certbot configuration before enabling
+
+### Development vs Production
+
+- The `tty: true` option in the web service provides readable logs for development
+- Comment this line in production deployments
+
+## Volumes
+
+| Volume    | Purpose                    | Path             |
+| --------- | -------------------------- | ---------------- |
+| `db_data` | Database files persistence | `/var/lib/mysql` |
+| `db_log`  | Database logs              | `/var/log/mysql` |
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Issues**:
+
+   ```bash
+   # Check database health
+   docker-compose exec db mysqladmin ping -h localhost -S /tmp/mysql.sock
+   ```
+
+2. **Permission Issues**:
+
+   ```bash
+   # Check container logs
+   docker-compose logs db
+   ```
+
+3. **Network Connectivity**:
+   - Ensure `LOCAL_IP` environment variable is set correctly
+   - Verify firewall settings allow necessary ports
+
+### Service Management
+
+```bash
+# Restart specific service
+docker-compose restart web
+
+# Rebuild and restart
+docker-compose up -d --build web
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (⚠️ DATA LOSS)
+docker-compose down -v
+```
+
+## Maintenance
+
+### Backup Database
+
+```bash
+# Create database backup
+docker-compose exec db mysqldump -u root -p --all-databases > backup.sql
+```
+
+### Update Services
+
+```bash
+# Pull latest changes and rebuild
+git pull
+docker-compose down
+docker-compose up -d --build
+```
+
+## Security Considerations
+
+- Change default database credentials in `mysql.env`
+- Use strong passwords for all accounts
+- Consider implementing SSL/TLS certificates for production
+- Regularly update base images and dependencies
+- Monitor container logs for suspicious activities
+
+---
+
+**Note**: This is a development/testing configuration. For production deployments, review security settings, enable SSL, and configure appropriate backup strategies.

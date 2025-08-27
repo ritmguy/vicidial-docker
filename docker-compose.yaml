@@ -49,20 +49,6 @@ services:
     network_mode: host
 
 
-    # networks:
-    #   backend:
-    #     ipv4_address: 10.10.10.15
-    #   frontend:
-
-    # ports:
-      # - "80:80"
-      # - "443:443"
-      # - "5060:5060" # SIP phone
-      # - "4569:4569" # IAX phones
-      # - "8089:8089" # WebRTC phones
-      # - "10000-10010:10000-10010/udp" # RTP streams for phones (may or may not be needed)
-
-
   web:
     container_name: vicidial-web
     build:
@@ -85,15 +71,7 @@ services:
 
     network_mode: host
 
-    # networks:
-    #   backend:
-    #     ipv4_address: 10.10.10.20
-    #   frontend:
-
-    # ports:
-    #   - "80:80"
-    #   - "443:443"
-    
+   
     volumes:
       - /var/www/html
       - ./docker/certbot/letsencrypt/certs:/etc/letsencrypt
@@ -113,22 +91,6 @@ services:
 
   #   # set proper network_mode to bind port 80 and get certificate before webserver starts
   #   network_mode: host
-
-
-networks:
-  backend:
-    name: vici-net
-    driver: bridge
-    # internal: true
-    # Set internal subnet
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.10.10.0/24
-
-  frontend:
-    name: vici-frontend
-    driver: bridge
  
  
 # Volumes needed for mariadb persistency
