@@ -61,6 +61,8 @@ RUN apt-get update -y && apt-get upgrade -y && \
     libgetopt-simple-perl \
     libnet-domain-tld-perl \
     libmail-sendmail-perl \
+    libtime-hires-perl \
+    libswitch-perl \
     ## Asterisk Stuff
     dahdi \
     asterisk-dahdi \
@@ -78,28 +80,25 @@ RUN cpan -i CPAN::Meta::Requirements \
     CPAN && \
     cpan reload CPAN
 
-RUN cpan force install Time::HiRes Switch
-
 
 
 ## PHP & Apache2 installs
 RUN add-apt-repository -y   ppa:ondrej/php && apt-get update  && \
     apt-get install -y \
-        libapache2-mod-php7.4 \
+        libapache2-mod-php8.4 \
         apache2 \
         certbot \
         python3-certbot-apache \
-        php7.4 \
-        php7.4-cli \
-        php7.4-common \
-        php7.4-json \
-        php7.4-mysql \
-        php7.4-readline \
-        php7.4-mysqli \
-        php7.4-dev \
-        php7.4-curl \
-        php7.4-xml \
-        php7.4-mbstring
+        php8.4 \
+        php8.4-cli \
+        php8.4-common \
+        php8.4-mysql \
+        php8.4-readline \
+        php8.4-mysqli \
+        php8.4-dev \
+        php8.4-curl \
+        php8.4-xml \
+        php8.4-mbstring
 ## Vicidial code downlaod
 RUN mkdir -p /usr/share/astguiclient && \
     cd /usr/share/astguiclient && \
@@ -146,7 +145,7 @@ RUN cd /usr/src && \
         libtool \
         shtool \
         libc6-dev && \
-    cd /usr/src/astguiclient/trunk && \
+    cd /usr/share/astguiclient/trunk && \
     perl install.pl \
         --no-prompt \
         --server_ip=${VICI_HOST} \
