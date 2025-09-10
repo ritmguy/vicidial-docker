@@ -101,8 +101,8 @@ RUN add-apt-repository -y   ppa:ondrej/php && apt-get update  && \
         php7.4-xml \
         php7.4-mbstring
 ## Vicidial code downlaod
-RUN mkdir -p /usr/src/astguiclient && \
-    cd /usr/src/astguiclient && \
+RUN mkdir -p /usr/share/astguiclient && \
+    cd /usr/share/astguiclient && \
     svn checkout svn://svn.eflo.net/agc_2-X/trunk && \
     cd trunk
 
