@@ -157,8 +157,8 @@ RUN cd /usr/src && \
 
 ## Copy vicidial custom supervisor, apache2, & vicidial conf files into the container
 COPY supervisord.conf /etc/supervisor/conf.d/
-COPY start_asterisk_boot.pl /usr/share/astguiclient/
-RUN chmod +x /usr/share/astguiclient/*.pl
+COPY start_asterisk_boot.pl /usr/share/astguiclient/trunk/
+RUN chmod +x /usr/share/astguiclient/trunk/*.pl
 COPY --chmod=0666 ./asterisk-conf/* /etc/asterisk/
 
 
