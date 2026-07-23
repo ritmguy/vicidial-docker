@@ -2,6 +2,25 @@
 
 A containerized deployment of VICIdial (Vicidial Internet Contact Center) using Docker Compose with MariaDB, web interface, and dialer components.
 
+## 📌 Current Version
+
+> ⚠️ **Deploying VICIdial? Use a tagged [release](../../releases), not `main`.**
+> `main` is the active development line — expect in-progress changes. Tagged
+> releases are the tested checkpoints meant for real installs.
+
+<!--
+Per-release block — replace this line on each release (see the maintainer release checklist). Format:
+
+**vX.Y.Z** — 🏷️ **<tagline>.** <one-line theme>:
+
+- 🐳 **<Headline>** — one concise sentence.
+- 🐛 **<Headline>** — …
+-->
+
+_No tagged release cut yet — see the [`[Unreleased]`](CHANGELOG.md) section of the changelog for what's pending._
+
+Full release notes and prior versions are in [CHANGELOG.md](CHANGELOG.md).
+
 ## Overview
 
 This Docker Compose configuration sets up a complete VICIdial environment with the following services:
