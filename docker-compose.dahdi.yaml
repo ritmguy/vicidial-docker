@@ -1,0 +1,24 @@
+# DAHDI timing overlay (OPT-IN).
+#
+# ConfBridge works out of the box on Asterisk's default timerfd timing, so this
+# overlay is only for hosts that want VICIdial's traditional DAHDI (dahdi_dummy)
+# software timer. It maps the host's /dev/dahdi/timer into the dialer; the dialer
+# entrypoint auto-detects that device and switches Asterisk to DAHDI timing.
+#
+# Host prep (needs an LTS/RHEL-class kernel that can build the dahdi module):
+#     sudo apt-get install -y dahdi-dkms dahdi linux-headers-$(uname -r)
+#     sudo modprobe dahdi dahdi_dummy      # creates /dev/dahdi/timer
+#
+# Then bring the stack up with both files:
+#     export LOCAL_IP=<your-lan-ip>
+#     docker-compose -f docker-compose.yaml -f docker-compose.dahdi.yaml up -d
+#
+# Verify inside the dialer:
+#     docker-compose exec dialer asterisk -rx "timing test"   # -> uses 'DAHDI'
+#
+# Without this overlay (plain `docker-compose up -d`) the dialer times off
+# timerfd and needs no kernel module — nothing breaks on hosts that lack DAHDI.
+services:
+  dialer:
+    devices:
+      - /dev/dahdi/timer:/dev/dahdi/timer

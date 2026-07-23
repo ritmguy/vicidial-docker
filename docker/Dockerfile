@@ -55,7 +55,9 @@ RUN crontab /etc/cron.d/vici_cron
 # Build vanilla Asterisk 20 from the GPG-verified, SHA256-pinned tarball.
 # apt-get update first: the base stage cleared /var/lib/apt/lists, and
 # Asterisk's install_prereq apt-installs its build deps.
-RUN apt-get update -y && cd /usr/src && \
+# dahdi-source ships /usr/include/dahdi/user.h so ./configure detects DAHDI and
+# res_timing_dahdi.so can be built (Task 4 timing). No kernel module is built here.
+RUN apt-get update -y && apt-get install -y --no-install-recommends dahdi-source && cd /usr/src && \
     wget -O asterisk.tar.gz "${ASTERISK_URL}" && \
     echo "${ASTERISK_SHA256}  asterisk.tar.gz" | sha256sum -c - && \
     tar -xzf asterisk.tar.gz && cd asterisk-${ASTERISK_VER}/ && \
@@ -64,9 +66,10 @@ RUN apt-get update -y && cd /usr/src && \
         --with-ssl --enable-asteriskssl --with-pjproject-bundled --with-jansson-bundled && \
     make menuselect/menuselect menuselect-tree menuselect.makeopts && \
     menuselect/menuselect --enable app_confbridge --enable res_srtp \
-        --enable res_http_websocket menuselect.makeopts && \
+        --enable res_http_websocket --enable res_timing_dahdi menuselect.makeopts && \
     make -j"$(nproc)" && make install && make samples && \
     sed -i 's|noload = chan_sip.so|;noload = chan_sip.so|g' /etc/asterisk/modules.conf && \
+    printf '\n; VICIdial ConfBridge profiles (auto-generated at runtime by ADMIN_keepalive_ALL.pl)\n#include confbridge-vicidial.conf\n' >> /etc/asterisk/confbridge.conf && \
     cd /usr/share/astguiclient/trunk && perl install.pl --no-prompt \
         --server_ip=${VICI_HOST} --without-web --DB_server=${VICI_DB} \
         --active_keepalives=1234568CS --khomp-enable
