@@ -1,6 +1,9 @@
 .DS_Store
 .env
 
+# Real DB creds — create from docker/mysql/mysql.env.example
+docker/mysql/mysql.env
+
 # Throwaway GitHub-release bodies — generated per release, never committed (see RELEASING.md)
 release-notes/
 
