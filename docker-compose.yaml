@@ -3,8 +3,9 @@ services:
   db:
     container_name: vicidial-db
     build:
-      context: './docker/mysql'
-      dockerfile: 'Dockerfile.mariadb'
+      context: './docker'
+      dockerfile: 'Dockerfile'
+      target: db
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-S", "/tmp/mysql.sock"]
@@ -12,103 +13,73 @@ services:
       timeout: 5s
       retries: 2
       start_period: 20s
-
     env_file:
       - './docker/mysql/mysql.env'
-
     network_mode: host
-
-    # networks:
-    #   backend:
-    #     ipv4_address: 10.10.10.10
-    
-    # ports:
-    #   - "3306:3306" 
-
     volumes:
       - db_data:/var/lib/mysql
       - db_log:/var/log/mysql
-      - ./docker/mysql/import:/var/lib/mysql-files
-      
-  dialer:
 
+  dialer:
     container_name: vicidial-dialer
     build:
-      context: './docker/dialer'
+      context: './docker'
+      dockerfile: 'Dockerfile'
+      target: dialer
       args:
         - VICI_DB=127.0.0.1
-        - VICI_HOST="${LOCAL_IP}"
-        - VICI_EXT_IP="${LOCAL_IP}"
-      dockerfile: 'Dockerfile'
-
+        - VICI_HOST=${LOCAL_IP}
+        - VICI_EXT_IP=${LOCAL_IP}
+    environment:
+      - VICI_HOST=${LOCAL_IP}
+      - VICI_DB=127.0.0.1
     restart: unless-stopped
     depends_on:
       db:
         condition: 'service_healthy'
-    
     network_mode: host
-
 
   web:
     container_name: vicidial-web
     build:
-      context: './docker/web'
+      context: './docker'
+      dockerfile: 'Dockerfile'
+      target: web
       args:
         - VICI_DB=127.0.0.1
-        - VICI_HOST="${LOCAL_IP}"
-        - VICI_EXT_IP="${LOCAL_IP}"
+        - VICI_HOST=${LOCAL_IP}
+        - VICI_EXT_IP=${LOCAL_IP}
         - VICI_WEB_HOST=true
-      dockerfile: 'Dockerfile'
-
-
     restart: unless-stopped
     depends_on:
       db:
         condition: 'service_healthy'
-      # certbot:
-      #   condition: 'service_completed_successfully'
-
-
     network_mode: host
-
-   
-    volumes:
-      - /var/www/html
-      - ./docker/certbot/letsencrypt/certs:/etc/letsencrypt
-      - ./docker/certbot/letsencrypt/data:/var/lib/letsencrypt
-
-
-    # comment the following line in production, it allows to have nice human-readable logs in dev
+    # tty gives readable logs in dev; comment out in production
     tty: true
 
+  # SSL (later track): Caddy-in-front is the planned direction, not certbot.
   # certbot:
   #   image: certbot/certbot
   #   volumes_from:
   #     - web
-
-  #   # set the domain & email for certbot here
   #   command: certonly --keep-until-expiring --standalone --email test@test.com --agree-tos --no-eff-email -d vici-dev.protect247.app
-
-  #   # set proper network_mode to bind port 80 and get certificate before webserver starts
   #   network_mode: host
- 
+
+# Bridge networks (kept commented; host networking is the default for SIP/RTP media)
 # networks:
 #   backend:
 #     name: vici-backend
 #     driver: bridge
 #     internal: true
-#     # Set internal subnet
 #     ipam:
 #       driver: default
 #       config:
 #         - subnet: 10.10.10.0/24
-
 #   frontend:
 #     name: vici-frontend
 #     driver: bridge
 
- 
-# Volumes needed for mariadb persistency
 volumes:
   db_data:
   db_log:
