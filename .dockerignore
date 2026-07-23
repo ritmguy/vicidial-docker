@@ -1,0 +1,10 @@
+.git
+.gitignore
+docs/
+release-notes/
+CLAUDE.local.md
+RELEASING.md
+.superpowers/
+docker/certbot/letsencrypt/certs
+docker/certbot/letsencrypt/data
+**/*.md
