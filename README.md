@@ -17,15 +17,11 @@ Per-release block — replace this line on each release (see the maintainer rele
 - 🐛 **<Headline>** — …
 -->
 
-**v0.2.0** — 🏷️ **DAHDI timing by default.** Corrects the v0.1.0 timing default to match VICIdial's own ConfBridge guidance:
+**v0.2.1** — 🏷️ **Server-identity fix.** A patch on top of v0.2.0:
 
-- ⏱️ **DAHDI is now the default conference timer** — the dialer maps `/dev/dahdi/timer`, because Asterisk's default timerfd is disturbed by the AGI forking VICIdial does constantly, which makes ConfBridge skip audio frames.
-- ⚠️ **Breaking: the dialer host must load the `dahdi` kernel module** — without it `docker-compose up` fails rather than starting a dialer with bad audio timing. No telephony hardware is needed; `dahdi_dummy` is a software timer.
-- 📋 **Host requirements are now documented** — supported kernels, the Secure Boot restriction, setup commands and how to verify the active timing source.
-- 🚧 **Escape hatch for unsuitable hosts** — `docker-compose.no-dahdi.yaml` falls back to timerfd so the stack still runs for evaluation and CI, and the dialer warns loudly at every startup while it's in use.
-- ⬆️ **Requires Docker Compose 2.24.4+** — that override depends on the `!reset` tag.
+- 🐛 **A dialer could overwrite another server's registration.** It identified its own row in `servers` by taking the first one returned — fine for a single server, but two dialers sharing a database would rewrite each other's IP on every restart. Nodes now identify themselves by VICIdial's unique `server_id` (set `VICI_SERVER_ID`), and refuse to realign anything rather than guess when it's ambiguous. This was reachable in a single-server install too, just by adding a second server in the admin UI.
 
-Previously, in **v0.1.0** — the first tagged release: one multi-stage build with VICIdial pinned to SVN r4005, Debian trixie with native PHP 8.4, vanilla Asterisk 20.20.1 (SHA256-pinned), ConfBridge replacing MeetMe, database credentials removed from the repo, and a fix for the broken schema import that was causing HTTP 500s in the admin UI.
+This patches **v0.2.0**, which made **DAHDI timing the default** per VICIdial's ConfBridge guidance — so the dialer host must load the `dahdi` kernel module (no telephony hardware needed) and Docker Compose 2.24.4+ is required. See [`docs/INSTALL.md`](docs/INSTALL.md), or `docker-compose.no-dahdi.yaml` for hosts that can't.
 
 Full release notes and prior versions are in [CHANGELOG.md](CHANGELOG.md).
 

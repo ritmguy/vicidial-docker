@@ -14,6 +14,16 @@ Deploys run from tags, never `main`.
 
 ### Fixed
 
+## [0.2.1] - 2026-07-24
+
+### Added
+
+- `VICI_SERVER_ID` (optional) on the dialer service. Set it to the node's VICIdial `server_id` when more than one server shares the database, so the dialer can identify its own row in `servers`. A single-server install can leave it unset.
+
+### Fixed
+
+- **The dialer could overwrite another server's registration.** It identified "its own" row in `servers` by taking the first row returned, which is only correct for a single server. With two dialers sharing one database, each would run `ADMIN_update_server_ip.pl` against whichever row came first and rewrite the other node's `server_ip` on every restart — the two would take turns stealing each other's identity, corrupting both the database and `astguiclient.conf`. A node now identifies itself by the unique `server_id`; when several servers share a database and `VICI_SERVER_ID` is unset, it skips IP alignment and logs why instead of guessing. The `conf_engine` update is likewise scoped to the node's own row. This was reachable in a single-server install too, simply by adding a second server through the admin UI.
+
 ## [0.2.0] - 2026-07-24
 
 ### Added
@@ -74,6 +84,7 @@ Deploys run from tags, never `main`.
 - Database credentials are no longer committed: the real `mysql.env` is gitignored, only `mysql.env.example` ships, and the previously exposed root password was rotated.
 - Configuration and SQL files are installed `0644` rather than world-writable.
 
-[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.1.0
