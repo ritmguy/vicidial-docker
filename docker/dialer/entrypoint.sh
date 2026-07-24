@@ -12,11 +12,21 @@ VICI_HOST="${VICI_HOST:-$(sed -n 's/^VARserver_ip *=> *//p' /etc/astguiclient.co
 SEED_IP="10.10.10.15"
 
 # DB creds straight from astguiclient.conf (authoritative for VICIdial).
-DBHOST=$(sed -n 's/^VARDB_server *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
 DBNAME=$(sed -n 's/^VARDB_database *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
 DBUSER=$(sed -n 's/^VARDB_user *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
 DBPASS=$(sed -n 's/^VARDB_pass *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
-DBHOST="${DBHOST:-$VICI_DB}"
+
+# The database host comes from the runtime environment, not the image. VARDB_server
+# is baked at build time, so honouring it first made VICI_DB a no-op. VICIdial's own
+# Perl scripts read astguiclient.conf, so rewrite the file too -- otherwise the
+# entrypoint would talk to one database while the cron jobs talked to another.
+DBHOST="${VICI_DB:-$(sed -n 's/^VARDB_server *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')}"
+DBHOST="${DBHOST:-127.0.0.1}"
+CONF_DBHOST=$(sed -n 's/^VARDB_server *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
+if [ "$CONF_DBHOST" != "$DBHOST" ]; then
+  echo "[entrypoint] pointing astguiclient.conf at database ${DBHOST} (was ${CONF_DBHOST})"
+  sed -i "s|^VARDB_server *=>.*|VARDB_server => ${DBHOST}|" /etc/astguiclient.conf
+fi
 
 # Debian trixie ships the MariaDB 11.x client, which requires TLS by default,
 # while the bundled 10.11 server offers none -- the CLI then dies with

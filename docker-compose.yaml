@@ -27,12 +27,12 @@ services:
       dockerfile: 'Dockerfile'
       target: dialer
       args:
-        - VICI_DB=127.0.0.1
+        - VICI_DB=${VICI_DB:-127.0.0.1}
         - VICI_HOST=${LOCAL_IP}
         - VICI_EXT_IP=${LOCAL_IP}
     environment:
       - VICI_HOST=${LOCAL_IP}
-      - VICI_DB=127.0.0.1
+      - VICI_DB=${VICI_DB:-127.0.0.1}
       # Only needed when several dialers share one database: set this to the
       # node's own VICIdial server_id so it can identify its own row in
       # `servers`. Left unset for a single-server install, where the one row is
@@ -72,7 +72,7 @@ services:
       dockerfile: 'Dockerfile'
       target: web
       args:
-        - VICI_DB=127.0.0.1
+        - VICI_DB=${VICI_DB:-127.0.0.1}
         - VICI_HOST=${LOCAL_IP}
         - VICI_EXT_IP=${LOCAL_IP}
         - VICI_WEB_HOST=true
