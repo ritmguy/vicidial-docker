@@ -17,16 +17,25 @@ Per-release block — replace this line on each release (see the maintainer rele
 - 🐛 **<Headline>** — …
 -->
 
-**v0.1.0** — 🏷️ **First tagged release.** A hardened, reproducible rebuild of the stack — pinned upstreams, secrets out of the repo, and modern conferencing:
+**v0.2.0** — 🏷️ **DAHDI timing by default.** Corrects the v0.1.0 timing default to match VICIdial's own ConfBridge guidance:
 
-- 🐳 **One multi-stage build** — the dialer and web images now share a single base and a single VICIdial checkout (pinned to SVN r4005), roughly halving build time and removing the risk of the two images drifting apart.
-- 🐧 **Debian trixie + native PHP 8.4** — the base image is pinned by digest and PHP comes from Debian main, so no third-party PPA is in the build path.
-- ☎️ **Asterisk 20.20.1** — vanilla upstream, fetched over HTTPS and checked against a pinned SHA256, replacing the end-of-life 18.21.0-vici build.
-- 🎙️ **ConfBridge replaces MeetMe** — `app_meetme` is no longer compiled; DAHDI timing is available as an opt-in overlay but is not required, since the default timerfd timing needs nothing from the host.
-- 🔐 **Database credentials out of the repo** — only `mysql.env.example` ships, the real file is gitignored, and the previously exposed root password was rotated.
-- 🐛 **Fixed the installer's broken database load** — a failed `cron@localhost` grant was aborting the schema import and discarding the admin user, which is what produced HTTP 500s in the admin UI.
+- ⏱️ **DAHDI is now the default conference timer** — the dialer maps `/dev/dahdi/timer`, because Asterisk's default timerfd is disturbed by the AGI forking VICIdial does constantly, which makes ConfBridge skip audio frames.
+- ⚠️ **Breaking: the dialer host must load the `dahdi` kernel module** — without it `docker-compose up` fails rather than starting a dialer with bad audio timing. No telephony hardware is needed; `dahdi_dummy` is a software timer.
+- 📋 **Host requirements are now documented** — supported kernels, the Secure Boot restriction, setup commands and how to verify the active timing source.
+- 🚧 **Escape hatch for unsuitable hosts** — `docker-compose.no-dahdi.yaml` falls back to timerfd so the stack still runs for evaluation and CI, and the dialer warns loudly at every startup while it's in use.
+- ⬆️ **Requires Docker Compose 2.24.4+** — that override depends on the `!reset` tag.
+
+Previously, in **v0.1.0** — the first tagged release: one multi-stage build with VICIdial pinned to SVN r4005, Debian trixie with native PHP 8.4, vanilla Asterisk 20.20.1 (SHA256-pinned), ConfBridge replacing MeetMe, database credentials removed from the repo, and a fix for the broken schema import that was causing HTTP 500s in the admin UI.
 
 Full release notes and prior versions are in [CHANGELOG.md](CHANGELOG.md).
+
+## Documentation
+
+| | |
+|---|---|
+| **[docs/INSTALL.md](docs/INSTALL.md)** | Host preparation, first install, and verifying it worked |
+| **[docs/USAGE.md](docs/USAGE.md)** | Day-to-day operation, backups, upgrading, troubleshooting |
+| **[CHANGELOG.md](CHANGELOG.md)** | What changed in each release |
 
 ## Overview
 
@@ -50,207 +59,87 @@ This Docker Compose configuration sets up a complete VICIdial environment with t
                    Host Network Mode
 ```
 
-## Prerequisites
+All three services share one `docker/Dockerfile`: a common `base` stage (Debian trixie, PHP 8.4, one pinned VICIdial checkout) feeding `dialer`, `web` and `db` targets.
+
+## Requirements
 
 - Docker Engine 20.10+
-- Docker Compose 2.0+
-- Minimum 4GB RAM
-- Minimum 20GB disk space
+- **Docker Compose 2.24.4+**
+- 4 GB RAM, 20 GB disk minimum
+- **A dialer host that can load the `dahdi` kernel module** — see below
 
-## Environment Setup
+> ### ⚠️ The dialer host must provide DAHDI timing
+>
+> The dialer maps `/dev/dahdi/timer`, so **`docker-compose up` fails if the `dahdi` module isn't loaded.** That's deliberate: VICIdial forks constantly for AGI, and Asterisk's default timerfd timer is disturbed by those forks, which makes ConfBridge drop conference audio.
+>
+> **No telephony hardware is required** — `dahdi_dummy` is a software timer. But the host kernel must be one DKMS can build against, and **Secure Boot must be off**.
+>
+> Full setup, supported kernels, and the escape hatch for hosts that can't run it: **[docs/INSTALL.md](docs/INSTALL.md)**.
 
-1. **Clone the repository** and navigate to the project directory
+## Quick start
 
-2. **Set up environment variables**:
+```sh
+git clone https://github.com/ritmguy/vicidial-docker.git
+cd vicidial-docker
+git fetch --tags && git checkout v0.2.0        # deploy from a tag, not main
 
-   ```bash
-   export LOCAL_IP=your.server.ip.address
-   ```
+# 1. host: load the DAHDI timer (see docs/INSTALL.md for kernel requirements)
+sudo apt-get install -y dahdi-dkms dahdi linux-headers-$(uname -r)
+sudo modprobe dahdi && sudo modprobe dahdi_dummy
 
-   Replace `your.server.ip.address` with your actual server IP address.
+# 2. database credentials (not shipped in the repo)
+cp docker/mysql/mysql.env.example docker/mysql/mysql.env
+$EDITOR docker/mysql/mysql.env
 
-3. **Configure MySQL environment**:
-   Edit `./docker/mysql/mysql.env` with your database configuration.
-
-## Directory Structure
-
-```
-.
-├── docker-compose.yaml
-├── docker/
-│   ├── mysql/
-│   │   ├── Dockerfile.mariadb
-│   │   ├── mysql.env
-│   │   └── import/          # MySQL import files
-│   ├── dialer/
-│   │   └── Dockerfile
-│   ├── web/
-│   │   └── Dockerfile
-│   └── certbot/
-│       └── letsencrypt/
-│           ├── certs/
-│           └── data/
-```
-
-## Services Configuration
-
-### Database Service (db)
-
-- **Container**: `vicidial-db`
-- **Image**: Custom MariaDB build
-- **Health Check**: MySQL ping on socket `/tmp/mysql.sock`
-- **Volumes**:
-  - `db_data`: Database files persistence
-  - `db_log`: Database logs
-  - `./docker/mysql/import`: Import directory for SQL files
-- **Network**: Host mode
-
-### Dialer Service (dialer)
-
-- **Container**: `vicidial-dialer`
-- **Dependencies**: Database service (healthy)
-- **Build Args**:
-  - `VICI_DB=127.0.0.1`
-  - `VICI_HOST=${LOCAL_IP}`
-  - `VICI_EXT_IP=${LOCAL_IP}`
-- **Network**: Host mode
-
-### Web Service (web)
-
-- **Container**: `vicidial-web`
-- **Dependencies**: Database service (healthy)
-- **Build Args**:
-  - `VICI_DB=127.0.0.1`
-  - `VICI_HOST=${LOCAL_IP}`
-  - `VICI_EXT_IP=${LOCAL_IP}`
-  - `VICI_WEB_HOST=true`
-- **Volumes**:
-  - `/var/www/html`: Web files
-  - SSL certificates (Let's Encrypt)
-- **Network**: Host mode
-
-## Installation & Usage
-
-### 1. Start the Services
-
-```bash
-# Build and start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# View specific service logs
-docker-compose logs -f web
-docker-compose logs -f dialer
-docker-compose logs -f db
-```
-
-### 2. Check Service Status
-
-```bash
-# Check running containers
-docker-compose ps
-
-# Check database health
-docker-compose exec db mysqladmin ping -h localhost -S /tmp/mysql.sock
-```
-
-### 3. Access the Application
-
-- **Web Interface**: `http://your-server-ip/vicidial/admin.php`
-- **Agent Interface**: `http://your-server-ip/agc/vicidial.php`
-
-## Important Notes
-
-### Network Configuration
-
-- All services use **host network mode** for direct access to host networking
-- This bypasses Docker's internal networking and uses the host's network stack directly
-- Commented port mappings are available if you prefer bridge networking
-
-### SSL/TLS Support
-
-- SSL certificate support via Let's Encrypt (currently commented out)
-- Uncomment the `certbot` service for automatic SSL certificate generation
-- Update email and domain in the certbot configuration before enabling
-
-### Development vs Production
-
-- The `tty: true` option in the web service provides readable logs for development
-- Comment this line in production deployments
-
-## Volumes
-
-| Volume    | Purpose                    | Path             |
-| --------- | -------------------------- | ---------------- |
-| `db_data` | Database files persistence | `/var/lib/mysql` |
-| `db_log`  | Database logs              | `/var/log/mysql` |
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Issues**:
-
-   ```bash
-   # Check database health
-   docker-compose exec db mysqladmin ping -h localhost -S /tmp/mysql.sock
-   ```
-
-2. **Permission Issues**:
-
-   ```bash
-   # Check container logs
-   docker-compose logs db
-   ```
-
-3. **Network Connectivity**:
-   - Ensure `LOCAL_IP` environment variable is set correctly
-   - Verify firewall settings allow necessary ports
-
-### Service Management
-
-```bash
-# Restart specific service
-docker-compose restart web
-
-# Rebuild and restart
-docker-compose up -d --build web
-
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes (⚠️ DATA LOSS)
-docker-compose down -v
-```
-
-## Maintenance
-
-### Backup Database
-
-```bash
-# Create database backup
-docker-compose exec db mysqldump -u root -p --all-databases > backup.sql
-```
-
-### Update Services
-
-```bash
-# Pull latest changes and rebuild
-git pull
-docker-compose down
+# 3. this host's LAN IP, then build
+export LOCAL_IP=192.0.2.10
 docker-compose up -d --build
 ```
 
-## Security Considerations
+Then open `http://<LOCAL_IP>/vicidial/admin.php` — the stock login is `6666` / `1234`, which you should change immediately.
 
-- Change default database credentials in `mysql.env`
-- Use strong passwords for all accounts
-- Consider implementing SSL/TLS certificates for production
-- Regularly update base images and dependencies
-- Monitor container logs for suspicious activities
+**Read [docs/INSTALL.md](docs/INSTALL.md) before a real deployment**; the steps above are the short version and skip the verification steps.
+
+## Repository layout
+
+```
+.
+├── docker-compose.yaml              # the stack (DAHDI timing by default)
+├── docker-compose.no-dahdi.yaml     # override: fall back to timerfd
+├── docker/
+│   ├── Dockerfile                   # one multi-stage build: base → dialer / web / db
+│   ├── dialer/
+│   │   ├── entrypoint.sh            # server registration, conf engine, timing
+│   │   ├── crontab                  # VICIdial's cron jobs
+│   │   ├── supervisord.conf
+│   │   └── asterisk-conf/           # VICIdial's Asterisk configs
+│   ├── web/
+│   │   ├── conf/                    # Apache vhosts
+│   │   └── html/
+│   └── mysql/
+│       ├── 00-init-grants.sh        # creates cron@localhost before the schema loads
+│       ├── my.cnf.mariadb
+│       └── mysql.env.example        # copy to mysql.env (gitignored)
+└── docs/                            # INSTALL.md, USAGE.md
+```
+
+## Services
+
+| Service | Container | What it is |
+|---|---|---|
+| `db` | `vicidial-db` | MariaDB 10.11. The schema is seeded from the pinned VICIdial checkout the first time the volume is empty. Persists in the `db_data` / `db_log` volumes. |
+| `dialer` | `vicidial-dialer` | Asterisk 20.20.1 plus VICIdial's Perl backend and cron jobs. Maps `/dev/dahdi/timer`. Takes the server address at runtime, so an IP change is a restart, not a rebuild. |
+| `web` | `vicidial-web` | Apache with PHP 8.4 serving the admin and agent interfaces. |
+
+All three use host networking, so they bind directly to the host's interfaces.
+
+## Security
+
+- Change the stock `6666` VICIdial login before exposing this anywhere.
+- `docker/mysql/mysql.env` holds real credentials and is gitignored — don't commit it.
+- Host networking puts MariaDB and SIP on every interface the host has. Firewall accordingly.
+- See the security notes in [docs/USAGE.md](docs/USAGE.md).
 
 ---
 
-**Note**: This is a development/testing configuration. For production deployments, review security settings, enable SSL, and configure appropriate backup strategies.
+**Note**: Review security settings, TLS termination and a backup strategy before production use.
