@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Unified multi-stage build: shared `base` -> `dialer` / `web` targets.
-# Task 3: Ubuntu base + vanilla Asterisk 20. Task 5 flips BASE_IMAGE to debian:trixie-slim.
-ARG BASE_IMAGE=ubuntu:22.04
+# Base: Debian trixie (pinned by digest) + vanilla Asterisk 20 + native PHP 8.4.
+ARG BASE_IMAGE=debian:trixie-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd
 ARG VICI_REV=4005
 ARG ASTERISK_VER=20.20.1
 ARG ASTERISK_URL=https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-20.20.1.tar.gz
@@ -18,23 +18,24 @@ RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && \
 # System + Perl + audio deps (certbot / ntp / dahdi removed vs. the old images;
 # dahdi headers are added in the dialer stage in Task 4).
 RUN apt-get update -y && apt-get install -y --no-install-recommends --no-install-suggests \
-    software-properties-common ca-certificates wget curl cron unzip zip build-essential \
+    ca-certificates wget curl cron unzip zip build-essential \
     libcurl4-openssl-dev libzip-dev libssl-dev libjansson-dev iftop libxml2-dev vim \
-    lsb-release gnupg screen libncurses5-dev libploticus0-dev libsqlite3-dev \
-    subversion subversion-tools supervisor mariadb-client* libmysqlclient-dev \
-    libmysql-diff-perl libnet-daemon-perl libwww-curl-perl libdbd-mysql libdbd-mysql-perl \
-    libdbi-perl libnet-telnet-perl libnet-server-perl libunicode-map8-perl libjcode-perl \
+    lsb-release gnupg screen libncurses-dev libploticus0-dev libsqlite3-dev \
+    subversion subversion-tools supervisor mariadb-client* default-libmysqlclient-dev \
+    libmysql-diff-perl libnet-daemon-perl libwww-curl-perl libdbd-mysql-perl \
+    libdbi-perl libnet-telnet-perl libnet-server-perl libunicode-map8-perl \
     libspreadsheet-writeexcel-perl libole-storage-lite-perl libspreadsheet-parseexcel-perl \
     libcurses-perl libgetopt-simple-perl libnet-domain-tld-perl libmail-sendmail-perl \
-    libtime-hires-perl libswitch-perl sipsak sox libsox-fmt-all lame mpg123 \
+    libswitch-perl sipsak sox libsox-fmt-all lame mpg123 \
  && rm -rf /var/lib/apt/lists/*
 
 RUN cpan -i CPAN::Meta::Requirements Digest::MD5 Digest::SHA1 CPAN && cpan reload CPAN
 
-# PHP 8.4 + Apache. Task 5: on trixie this whole block becomes native `php-*` from Debian main.
-RUN add-apt-repository -y ppa:ondrej/php && apt-get update && apt-get install -y \
-    libapache2-mod-php8.4 apache2 php8.4 php8.4-cli php8.4-common php8.4-mysql \
-    php8.4-readline php8.4-mysqli php8.4-dev php8.4-curl php8.4-xml php8.4-mbstring \
+# PHP 8.4 + Apache — native from Debian trixie main (no PPA; php-* metapackages = 8.4).
+# php-mysql provides the mysqli extension; Time::HiRes is core Perl on Debian.
+RUN apt-get update -y && apt-get install -y \
+    apache2 libapache2-mod-php php-cli php-common php-mysql \
+    php-readline php-dev php-curl php-xml php-mbstring \
  && rm -rf /var/lib/apt/lists/*
 
 # Single pinned VICIdial checkout, shared by both targets (kills the split-brain risk).
