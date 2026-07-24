@@ -1,0 +1,25 @@
+# Escape hatch for hosts that cannot load the dahdi kernel module.
+#
+#     docker-compose -f docker-compose.yaml -f docker-compose.no-dahdi.yaml up -d
+#
+# This removes the /dev/dahdi/timer device mapping, so Asterisk falls back to its
+# built-in timerfd timer and the stack starts on any kernel.
+#
+# ⚠️  NOT RECOMMENDED FOR PRODUCTION. VICIdial's own ConfBridge documentation is
+# explicit about why:
+#
+#     "the res_timing_timerfd.so module which is the default is affected whenever
+#      Asterisk forks itself like whenever an AGI script is executed. This can
+#      cause audio frames to be skipped by ConfBridge. Vicidial uses AGI scripts
+#      heavily."
+#     -- https://www.vicidial.org/docs/ConfBridge%20Documentation.txt
+#
+# In other words: on a busy dialer this is heard as choppy or dropped conference
+# audio. Use it for evaluation, CI, development, or a host whose kernel genuinely
+# cannot build DAHDI -- not for live calling.
+#
+# Requires Docker Compose >= 2.24.4 (the `!reset` tag). On older Compose the tag
+# is not understood and the override will fail.
+services:
+  dialer:
+    devices: !reset []

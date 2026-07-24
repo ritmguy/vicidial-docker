@@ -38,6 +38,17 @@ services:
       db:
         condition: 'service_healthy'
     network_mode: host
+    # DAHDI software timing. VICIdial's own ConfBridge docs call for this: the
+    # default res_timing_timerfd.so is disturbed whenever Asterisk forks (which
+    # VICIdial does constantly, for AGI), and that makes ConfBridge skip audio
+    # frames. The entrypoint detects this device and noloads the userspace timers.
+    #
+    # REQUIRES the dahdi kernel module on this host -- see "Dialer host
+    # requirements" in README.md. Without /dev/dahdi/timer, `docker-compose up`
+    # will FAIL here rather than start a container with bad audio timing.
+    # No kmod available? See docker-compose.no-dahdi.yaml (not for production).
+    devices:
+      - /dev/dahdi/timer:/dev/dahdi/timer
 
   web:
     container_name: vicidial-web

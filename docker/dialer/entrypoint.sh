@@ -61,17 +61,27 @@ if [ -n "$VICI_HOST" ] && [ -n "$DBUSER" ]; then
     || echo "[entrypoint] conf_engine UPDATE returned nonzero (continuing)"
 fi
 
-# Timing source. ConfBridge needs a timing interface; Asterisk's default
-# res_timing_timerfd works in any container with no host dependency, so it is
-# the default. If a host provides DAHDI timing (dahdi kmod loaded and the
-# docker-compose.dahdi.yaml overlay maps /dev/dahdi/timer into the container),
-# force DAHDI by noloading the userspace timers — VICIdial's traditional timer.
+# Timing source. VICIdial's ConfBridge documentation calls for DAHDI timing:
+# Asterisk's default res_timing_timerfd is disturbed every time Asterisk forks,
+# which VICIdial does constantly for AGI, and that makes ConfBridge skip audio
+# frames. So when /dev/dahdi/timer is mapped in (the default -- see the dialer
+# `devices:` block in docker-compose.yaml) we noload the userspace timers, which
+# leaves res_timing_dahdi as the only timing interface Asterisk can pick.
 if [ -c /dev/dahdi/timer ]; then
-  echo "[entrypoint] /dev/dahdi/timer present -> forcing DAHDI timing"
+  echo "[entrypoint] /dev/dahdi/timer present -> DAHDI timing (recommended)"
   grep -q '^noload => res_timing_timerfd.so' /etc/asterisk/modules.conf || \
     printf '\nnoload => res_timing_timerfd.so\nnoload => res_timing_kqueue.so\nnoload => res_timing_pthread.so\n' >> /etc/asterisk/modules.conf
 else
-  echo "[entrypoint] no /dev/dahdi/timer -> using default timerfd timing"
+  echo "[entrypoint] ============================ WARNING ============================"
+  echo "[entrypoint] No /dev/dahdi/timer -- falling back to Asterisk's timerfd timer."
+  echo "[entrypoint] This is NOT RECOMMENDED FOR PRODUCTION. VICIdial forks heavily"
+  echo "[entrypoint] for AGI, and timerfd is disturbed by those forks, which makes"
+  echo "[entrypoint] ConfBridge skip audio frames -- heard as choppy conference audio"
+  echo "[entrypoint] on a busy dialer. See VICIdial's ConfBridge documentation:"
+  echo "[entrypoint]   https://www.vicidial.org/docs/ConfBridge%20Documentation.txt"
+  echo "[entrypoint] Fix: load the dahdi kmod on this host (see README, 'Dialer host"
+  echo "[entrypoint] requirements') so the default device mapping can be used."
+  echo "[entrypoint] ================================================================="
 fi
 
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
