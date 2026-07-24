@@ -14,6 +14,29 @@ Deploys run from tags, never `main`.
 
 ### Fixed
 
+## [0.2.0] - 2026-07-24
+
+### Added
+
+- `docker-compose.no-dahdi.yaml`, an escape hatch that removes the DAHDI device mapping for hosts whose kernel cannot build the module. It falls back to timerfd timing so the stack starts anywhere, and is intended for evaluation, CI and development rather than live calling.
+- **`docs/INSTALL.md`** — installation from a clean host: requirements, DAHDI host preparation (supported kernels, the Secure Boot restriction, setup commands), creating the credentials file, building, and verifying the result.
+- **`docs/USAGE.md`** — day-to-day operation: everyday commands, changing the server's IP, database access, backup and restore, upgrading between tags, volumes, troubleshooting and security notes.
+
+### Changed
+
+- **BREAKING** — **DAHDI timing is now the default.** The dialer maps `/dev/dahdi/timer`, so the `dahdi` kernel module must be loaded on the dialer host; without it `docker-compose up` fails at container creation. This follows VICIdial's own ConfBridge documentation: Asterisk's default `res_timing_timerfd` is disturbed whenever Asterisk forks — which VICIdial does constantly for AGI — and that causes ConfBridge to skip audio frames. No telephony hardware is needed, only the software `dahdi_dummy` timer.
+- **BREAKING** — the minimum supported Docker Compose is now **2.24.4**, since the `no-dahdi` override relies on the `!reset` tag introduced in that version.
+- The dialer logs a prominent warning at startup whenever it falls back to timerfd timing, so an unsuitable host is obvious in the logs rather than silent.
+- The README is now a front page — overview, current release, requirements and a quick start — with installation and operation moved into `docs/`. Its previous setup instructions described a layout that no longer existed: files removed during the multi-stage rebuild, a `mysql.env` that is no longer shipped, a `/var/www/html` volume that was deliberately dropped, and a `certbot` service that is gone.
+
+### Removed
+
+- `docker-compose.dahdi.yaml`, which is redundant now that DAHDI is the default. Hosts that cannot run DAHDI use `docker-compose.no-dahdi.yaml` instead.
+
+### Fixed
+
+- `generate-local-ip-env.sh` now works on Linux. It used `ifconfig`, which modern distributions don't install by default, and concatenated every address on a multi-homed host into one malformed value. It now takes the source address of the default route, writes a single address, and fails with a clear message if it can't determine one.
+
 ## [0.1.0] - 2026-07-24
 
 ### Added
@@ -51,5 +74,6 @@ Deploys run from tags, never `main`.
 - Database credentials are no longer committed: the real `mysql.env` is gitignored, only `mysql.env.example` ships, and the previously exposed root password was rotated.
 - Configuration and SQL files are installed `0644` rather than world-writable.
 
-[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.1.0
