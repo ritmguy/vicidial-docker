@@ -17,7 +17,14 @@ Per-release block — replace this line on each release (see the maintainer rele
 - 🐛 **<Headline>** — …
 -->
 
-_No tagged release cut yet — see the [`[Unreleased]`](CHANGELOG.md) section of the changelog for what's pending._
+**v0.1.0** — 🏷️ **First tagged release.** A hardened, reproducible rebuild of the stack — pinned upstreams, secrets out of the repo, and modern conferencing:
+
+- 🐳 **One multi-stage build** — the dialer and web images now share a single base and a single VICIdial checkout (pinned to SVN r4005), roughly halving build time and removing the risk of the two images drifting apart.
+- 🐧 **Debian trixie + native PHP 8.4** — the base image is pinned by digest and PHP comes from Debian main, so no third-party PPA is in the build path.
+- ☎️ **Asterisk 20.20.1** — vanilla upstream, fetched over HTTPS and checked against a pinned SHA256, replacing the end-of-life 18.21.0-vici build.
+- 🎙️ **ConfBridge replaces MeetMe** — `app_meetme` is no longer compiled; DAHDI timing is available as an opt-in overlay but is not required, since the default timerfd timing needs nothing from the host.
+- 🔐 **Database credentials out of the repo** — only `mysql.env.example` ships, the real file is gitignored, and the previously exposed root password was rotated.
+- 🐛 **Fixed the installer's broken database load** — a failed `cron@localhost` grant was aborting the schema import and discarding the admin user, which is what produced HTTP 500s in the admin UI.
 
 Full release notes and prior versions are in [CHANGELOG.md](CHANGELOG.md).
 

@@ -10,6 +10,14 @@ Deploys run from tags, never `main`.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.1.0] - 2026-07-24
+
+### Added
+
 - Opt-in DAHDI timing overlay `docker-compose.dahdi.yaml`, which maps `/dev/dahdi/timer` into the dialer for hosts that load the `dahdi` kernel module; the entrypoint detects the device and switches Asterisk to DAHDI timing. It is not required — without it the dialer uses Asterisk's built-in `timerfd` timing and needs nothing from the host.
 - `docker/mysql/mysql.env.example` as the template for database credentials.
 - `.dockerignore`, keeping git metadata, docs and certificates out of the build context.
@@ -43,4 +51,5 @@ Deploys run from tags, never `main`.
 - Database credentials are no longer committed: the real `mysql.env` is gitignored, only `mysql.env.example` ships, and the previously exposed root password was rotated.
 - Configuration and SQL files are installed `0644` rather than world-writable.
 
-[Unreleased]: https://github.com/ritmguy/vicidial-docker/commits/main
+[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.1.0
