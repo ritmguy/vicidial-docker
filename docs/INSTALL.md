@@ -129,6 +129,28 @@ export LOCAL_IP=192.0.2.10              # this shell only
 
 ---
 
+## 5a. Choose which roles this host runs
+
+A single machine runs all three roles, which is what most installs want and is
+what you get from a plain:
+
+    docker-compose up -d
+
+To split roles across machines, name the services that host should run:
+
+    docker-compose up -d db web      # on the database/web host
+    docker-compose up -d dialer      # on each dialer host
+
+A dialer host must also be told where the database is, in `.env`:
+
+    VICI_DB=192.0.2.10
+
+> Multi-host deployment is not complete yet: remote database grants and node
+> registration are still to come. On a single machine, all three roles together
+> is the supported arrangement.
+
+---
+
 ## 6. Build and start
 
 ```sh

@@ -10,7 +10,12 @@ Deploys run from tags, never `main`.
 
 ### Added
 
+- Roles can now be selected per host by naming services: `docker-compose up -d dialer` starts only the dialer, `up -d db web` only the database and web. A plain `docker-compose up -d` still starts everything, so single-machine installs are unaffected.
+
 ### Changed
+
+- `VICI_DB` is now honoured at runtime and rewrites `VARDB_server` in `astguiclient.conf`, so VICIdial's cron jobs use the same database as the entrypoint. It was previously ignored, because the value baked into the image took precedence.
+- The `dialer` and `web` services no longer declare `depends_on: db`, so they can start on a host with no local database. The dialer entrypoint already waits for the database before using it.
 
 ### Fixed
 
