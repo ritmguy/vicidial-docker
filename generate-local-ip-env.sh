@@ -22,5 +22,9 @@ if [ -z "${LOCAL_IP:-}" ]; then
   exit 1
 fi
 
-echo "LOCAL_IP=${LOCAL_IP}" > .env
+if [ -f .env ]; then
+  grep -v '^LOCAL_IP=' .env > .env.tmp || true
+  mv .env.tmp .env
+fi
+echo "LOCAL_IP=${LOCAL_IP}" >> .env
 echo "Wrote .env with LOCAL_IP=${LOCAL_IP}"

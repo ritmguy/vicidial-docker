@@ -16,7 +16,7 @@ Plan for the first build to take roughly **10–30 minutes** — Asterisk is com
 | **Disk** | 20 GB minimum |
 | **Kernel** | must be able to build the `dahdi` module — see the next section |
 
-This is a single-host stack: database, dialer and web all run on one machine using host networking.
+By default this runs as a single-host stack: database, dialer and web all run on one machine using host networking. §5a covers splitting roles across more than one host; host networking applies throughout either way.
 
 ---
 
@@ -134,16 +134,22 @@ export LOCAL_IP=192.0.2.10              # this shell only
 A single machine runs all three roles, which is what most installs want and is
 what you get from a plain:
 
-    docker-compose up -d
+```sh
+docker-compose up -d
+```
 
 To split roles across machines, name the services that host should run:
 
-    docker-compose up -d db web      # on the database/web host
-    docker-compose up -d dialer      # on each dialer host
+```sh
+docker-compose up -d db web      # on the database/web host
+docker-compose up -d dialer      # on each dialer host
+```
 
 A dialer host must also be told where the database is, in `.env`:
 
-    VICI_DB=192.0.2.10
+```sh
+VICI_DB=192.0.2.10
+```
 
 > Multi-host deployment is not complete yet: remote database grants and node
 > registration are still to come. On a single machine, all three roles together
@@ -156,6 +162,8 @@ A dialer host must also be told where the database is, in `.env`:
 ```sh
 docker-compose up -d --build
 ```
+
+A host running only a subset of roles (§5a) should name its services here too, e.g. `docker-compose up -d --build db web`, or the bare command above builds and starts every role regardless.
 
 The first run compiles Asterisk, so give it time. Watch progress with:
 

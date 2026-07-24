@@ -222,9 +222,9 @@ docker-compose up -d db web       # database + web only
 docker-compose up -d dialer       # dialer only
 ```
 
-Nothing needs configuring for this — the services no longer depend on each
-other, so naming one starts only that one. A dialer started before its database
-waits for it rather than failing; watch it with:
+Nothing in the compose file needs changing for this — the services no longer
+depend on each other, so naming one starts only that one. A dialer started
+before its database waits for it rather than failing; watch it with:
 
 ```sh
 docker-compose logs -f dialer
@@ -233,11 +233,12 @@ docker-compose logs -f dialer
 A dialer on a host with no local database also needs `VICI_DB` set in `.env`
 to point at the database host.
 
-On a cold `docker-compose up -d`, a page load during the database's first
-boot — roughly 20-40 seconds while it initialises — can hit a PHP database
+On a cold `docker-compose up -d`, a page load during the database's start-up
+window — roughly 20-40 seconds while it initialises — can hit a PHP database
 error rather than simply not responding, because `web` no longer waits for
-`db`. This is expected on a fresh volume's first boot only; wait for
-`docker-compose ps` to show `db` as `(healthy)` and reload.
+`db`. This is most noticeable on a fresh volume's first boot, but the same
+brief window exists on any restart too; wait for `docker-compose ps` to show
+`db` as `(healthy)` and reload.
 
 ---
 

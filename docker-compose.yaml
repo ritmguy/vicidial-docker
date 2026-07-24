@@ -32,7 +32,12 @@ services:
         - VICI_EXT_IP=${LOCAL_IP}
     environment:
       - VICI_HOST=${LOCAL_IP}
-      - VICI_DB=${VICI_DB:-127.0.0.1}
+      # Intentionally empty by default (not :-127.0.0.1): if this were ever set
+      # unconditionally, a runtime start without VICI_DB would silently rewrite
+      # astguiclient.conf to 127.0.0.1, overriding whatever was baked in at
+      # build time with --build-arg VICI_DB=<host>. Leaving it empty lets the
+      # entrypoint fall back to the build-time value when no runtime value is given.
+      - VICI_DB=${VICI_DB:-}
       # Only needed when several dialers share one database: set this to the
       # node's own VICIdial server_id so it can identify its own row in
       # `servers`. Left unset for a single-server install, where the one row is

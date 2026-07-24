@@ -8,7 +8,6 @@
 set -e
 # Prefer the runtime env; fall back to whatever was baked into astguiclient.conf.
 VICI_HOST="${VICI_HOST:-$(sed -n 's/^VARserver_ip *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')}"
-SEED_IP="10.10.10.15"
 
 # DB creds straight from astguiclient.conf (authoritative for VICIdial).
 DBNAME=$(sed -n 's/^VARDB_database *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
@@ -19,9 +18,21 @@ DBPASS=$(sed -n 's/^VARDB_pass *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
 # is baked at build time, so honouring it first made VICI_DB a no-op. VICIdial's own
 # Perl scripts read astguiclient.conf, so rewrite the file too -- otherwise the
 # entrypoint would talk to one database while the cron jobs talked to another.
-DBHOST="${VICI_DB:-$(sed -n 's/^VARDB_server *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')}"
-DBHOST="${DBHOST:-127.0.0.1}"
 CONF_DBHOST=$(sed -n 's/^VARDB_server *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
+DBHOST="${VICI_DB:-$CONF_DBHOST}"
+DBHOST="${DBHOST:-127.0.0.1}"
+
+# Reject anything that isn't a plain hostname/IP before it reaches sed or mysql.
+# Unescaped shell metacharacters (&, \, |) in DBHOST would corrupt the sed
+# replacement below or abort it outright, and VICIdial's own config parser
+# strips #, ; and whitespace from conf values anyway, so such a value could
+# never work even if it were written out successfully.
+case "$DBHOST" in
+  *[!A-Za-z0-9._-]*)
+    echo "[entrypoint] FATAL: invalid database host '${DBHOST}' -- only letters, digits, dot, dash and underscore are allowed."
+    exit 1 ;;
+esac
+
 if [ "$CONF_DBHOST" != "$DBHOST" ]; then
   echo "[entrypoint] pointing astguiclient.conf at database ${DBHOST} (was ${CONF_DBHOST})"
   sed -i "s|^VARDB_server *=>.*|VARDB_server => ${DBHOST}|" /etc/astguiclient.conf
@@ -41,6 +52,12 @@ for i in $(seq 1 60); do
   mysqladmin $MYSQL_OPTS ping -h "$DBHOST" --silent 2>/dev/null && break
   sleep 2
 done
+
+if ! mysqladmin $MYSQL_OPTS ping -h "$DBHOST" --silent 2>/dev/null; then
+  echo "[entrypoint] FATAL: database ${DBHOST}:3306 unreachable after 120s. Exiting so Docker restarts and retries."
+  echo "[entrypoint] If this is a dialer-only host, check VICI_DB points at the database host and that it accepts remote connections."
+  exit 1
+fi
 
 # Work out WHICH server row belongs to this node before touching anything.
 #
