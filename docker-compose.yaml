@@ -40,9 +40,10 @@ services:
       # server's IP rather than risk overwriting another dialer's registration.
       - VICI_SERVER_ID=${VICI_SERVER_ID:-}
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: 'service_healthy'
+    # No depends_on: a dialer may run on a host with no local database, and
+    # naming a service (`docker-compose up -d dialer`) is how a role is selected.
+    # The entrypoint waits for the database itself (mysqladmin ping, 60 x 2s),
+    # which also covers a remote host.
     network_mode: host
     # DAHDI software timing. VICIdial's own ConfBridge docs call for this: the
     # default res_timing_timerfd.so is disturbed whenever Asterisk forks (which
@@ -77,9 +78,8 @@ services:
         - VICI_EXT_IP=${LOCAL_IP}
         - VICI_WEB_HOST=true
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: 'service_healthy'
+    # No depends_on: the web role may run on a host with no local database.
+    # Apache serves immediately; PHP connects per request.
     network_mode: host
     # tty gives readable logs in dev; comment out in production
     tty: true
