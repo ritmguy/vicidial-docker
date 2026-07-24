@@ -283,6 +283,27 @@ docker-compose up -d --build web
 
 ---
 
+## Database exposure
+
+MariaDB listens on **loopback only** (`bind-address=127.0.0.1` in `docker/mysql/my.cnf.mariadb`). All three roles share the host's network namespace, so they reach it over `127.0.0.1` and nothing else is needed.
+
+This matters because of `network_mode: host`: without that setting MariaDB would listen on `0.0.0.0`, which here means every interface the host has. The accounts are also restricted to loopback — `cron@127.0.0.1`, `cron@::1`, `cron@localhost` and `root@localhost`, with no wildcard `@'%'` accounts.
+
+Note that `cron`'s password is VICIdial's default `1234`, because it has to match what is baked into `astguiclient.conf`. That is only acceptable while the database is unreachable from the network — so do not widen `bind-address` casually.
+
+**Existing installations need a one-off cleanup.** The database's init scripts only run against an empty volume, so an install created before this change still has the wildcard accounts. Restarting picks up the loopback `bind-address`, which is the control that matters, but to remove the accounts too:
+
+```sh
+docker-compose exec db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "
+  CREATE USER IF NOT EXISTS \"cron\"@\"127.0.0.1\" IDENTIFIED BY \"1234\";
+  GRANT ALL PRIVILEGES ON *.* TO \"cron\"@\"127.0.0.1\";
+  DROP USER IF EXISTS \"cron\"@\"%\";
+  DROP USER IF EXISTS \"root\"@\"%\";
+  FLUSH PRIVILEGES;"'
+```
+
+Substitute your own `MYSQL_PASSWORD` if you changed it from `1234`. Create the `cron@127.0.0.1` account **before** dropping the wildcard: a `localhost` grant covers socket connections only, so a TCP connection to `127.0.0.1` needs an account for that host specifically, and dropping the wildcard without it locks every service out with `ERROR 1045`.
+
 ## Security notes
 
 - Change the VICIdial `6666` login, and the `cron` database password (which must be changed in both `mysql.env` and VICIdial's configuration together).

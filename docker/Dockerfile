@@ -110,4 +110,7 @@ RUN sed -i 's|socket *= */run/mysqld/mysqld.sock|socket = /tmp/mysql.sock|g' /et
 COPY --chmod=0755 mysql/00-init-grants.sh /docker-entrypoint-initdb.d/00-init-grants.sh
 COPY --from=base /usr/share/astguiclient/trunk/extras/MySQL_AST_CREATE_tables.sql /docker-entrypoint-initdb.d/01-schema.sql
 COPY --from=base /usr/share/astguiclient/trunk/extras/first_server_install.sql /docker-entrypoint-initdb.d/02-first-server.sql
+# 03- runs last: drops the wildcard cron@'%' / root@'%' accounts the entrypoint
+# and schema load require, once they are no longer needed.
+COPY --chmod=0755 mysql/03-lockdown.sh /docker-entrypoint-initdb.d/03-lockdown.sh
 EXPOSE 3306

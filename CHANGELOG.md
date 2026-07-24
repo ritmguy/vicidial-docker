@@ -8,6 +8,10 @@ Deploys run from tags, never `main`.
 
 ## [Unreleased]
 
+### Security
+
+- **The database was reachable from the network with a default password.** MariaDB had no `bind-address`, so it listened on `0.0.0.0`; combined with `network_mode: host` that meant every interface the host has. The MariaDB image had also created wildcard `cron@'%'` and `root@'%'` accounts, so any host able to route to the machine could log into the VICIdial database as `cron` with the documented default password `1234` — which grants access to lead data, agent accounts and call metadata. MariaDB now binds to `127.0.0.1`, and a new init step replaces the wildcard accounts with explicit loopback ones (`cron@127.0.0.1`, `cron@::1`). **An existing installation keeps its wildcard accounts**, because init scripts only run against an empty database volume: restarting applies the loopback bind, which is the control that matters, and `docs/USAGE.md` gives a one-off command to remove the accounts as well.
+
 ### Added
 
 - Roles can now be selected per host by naming services: `docker-compose up -d dialer` starts only the dialer, `up -d db web` only the database and web. A plain `docker-compose up -d` still starts everything.
