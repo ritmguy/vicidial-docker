@@ -169,6 +169,37 @@ Pass **both** `-f` flags whenever you start or recreate containers (`up`, or a `
 
 ---
 
+## More than one server in the database
+
+A single-server install needs nothing here. But VICIdial lets you add further servers in the admin UI, and the dialer has to know which row in `servers` is its own before it corrects that row's IP address.
+
+It identifies itself by VICIdial's `server_id`:
+
+```yaml
+services:
+  dialer:
+    environment:
+      - VICI_SERVER_ID=dialer1      # this node's server_id
+```
+
+or per invocation:
+
+```sh
+VICI_SERVER_ID=dialer1 docker-compose up -d dialer
+```
+
+**If several servers share the database and `VICI_SERVER_ID` isn't set, the dialer will not realign any server's IP.** It logs why and carries on, instead of guessing and possibly rewriting another dialer's registration. You'll see:
+
+```
+[entrypoint] N servers share this database, but VICI_SERVER_ID is not
+[entrypoint] set, so this node cannot tell which row is its own.
+[entrypoint] SKIPPING server-IP alignment ...
+```
+
+The fix is to set the variable to the `server_id` shown in the admin UI under Admin → Servers.
+
+> Note: this makes multi-server *safe*, not *supported*. A full multi-dialer topology — remote database access, credential distribution, shared recordings — is not covered by this stack yet.
+
 ## Networking
 
 All three services use host networking, so they bind directly to the host's interfaces and there is no Docker port mapping to configure. The ports in play:

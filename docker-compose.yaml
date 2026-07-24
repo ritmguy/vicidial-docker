@@ -33,6 +33,12 @@ services:
     environment:
       - VICI_HOST=${LOCAL_IP}
       - VICI_DB=127.0.0.1
+      # Only needed when several dialers share one database: set this to the
+      # node's own VICIdial server_id so it can identify its own row in
+      # `servers`. Left unset for a single-server install, where the one row is
+      # unambiguous. Without it, a node sharing a DB refuses to realign any
+      # server's IP rather than risk overwriting another dialer's registration.
+      - VICI_SERVER_ID=${VICI_SERVER_ID:-}
     restart: unless-stopped
     depends_on:
       db:
