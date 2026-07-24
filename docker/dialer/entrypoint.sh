@@ -11,31 +11,53 @@ VICI_DB="${VICI_DB:-127.0.0.1}"
 VICI_HOST="${VICI_HOST:-$(sed -n 's/^VARserver_ip *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')}"
 SEED_IP="10.10.10.15"
 
-echo "[entrypoint] server IP=${VICI_HOST:-unknown}; waiting for DB ${VICI_DB}:3306 ..."
+# DB creds straight from astguiclient.conf (authoritative for VICIdial).
+DBHOST=$(sed -n 's/^VARDB_server *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
+DBNAME=$(sed -n 's/^VARDB_database *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
+DBUSER=$(sed -n 's/^VARDB_user *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
+DBPASS=$(sed -n 's/^VARDB_pass *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
+DBHOST="${DBHOST:-$VICI_DB}"
+
+# Debian trixie ships the MariaDB 11.x client, which requires TLS by default,
+# while the bundled 10.11 server offers none -- the CLI then dies with
+# "SSL is required, but the server does not support it". These calls are local
+# (loopback/host net), and VICIdial's own PHP/Perl already connect in plaintext,
+# so force plaintext here too. Without this the conf_engine UPDATE below is a
+# silent no-op on Debian.
+MYSQL_OPTS="--skip-ssl"
+mysql_q() { mysql $MYSQL_OPTS -h "$DBHOST" -u"$DBUSER" -p"$DBPASS" "$DBNAME" -N -B -e "$1" 2>/dev/null; }
+
+echo "[entrypoint] server IP=${VICI_HOST:-unknown}; waiting for DB ${DBHOST}:3306 ..."
 for i in $(seq 1 60); do
-  mysqladmin ping -h "$VICI_DB" --silent 2>/dev/null && break
+  mysqladmin $MYSQL_OPTS ping -h "$DBHOST" --silent 2>/dev/null && break
   sleep 2
 done
 
-if [ -n "$VICI_HOST" ] && [ "$VICI_HOST" != "$SEED_IP" ]; then
-  echo "[entrypoint] aligning seeded server ${SEED_IP} -> ${VICI_HOST}"
-  ( cd /usr/share/astguiclient/trunk/bin && \
-    perl ADMIN_update_server_ip.pl --auto --old-server_ip="$SEED_IP" --server_ip="$VICI_HOST" ) 2>&1 | tail -4 \
-    || echo "[entrypoint] ADMIN_update_server_ip.pl returned nonzero (continuing)"
+# Align the registered server row to this host's IP. Align from whatever is
+# CURRENTLY registered rather than only the seed IP: on a rebuilt container with
+# an existing DB volume the row already holds a previous host IP, and keying off
+# the seed would silently leave it stale after a network change. Single-host
+# all-in-one image, so the first row is the server.
+if [ -n "$VICI_HOST" ] && [ -n "$DBUSER" ]; then
+  CUR_IP=$(mysql_q "SELECT server_ip FROM servers LIMIT 1;")
+  CUR_IP="${CUR_IP:-$SEED_IP}"
+  if [ "$CUR_IP" != "$VICI_HOST" ]; then
+    echo "[entrypoint] aligning registered server ${CUR_IP} -> ${VICI_HOST}"
+    ( cd /usr/share/astguiclient/trunk/bin && \
+      perl ADMIN_update_server_ip.pl --auto --old-server_ip="$CUR_IP" --server_ip="$VICI_HOST" ) 2>&1 | tail -4 \
+      || echo "[entrypoint] ADMIN_update_server_ip.pl returned nonzero (continuing)"
+  else
+    echo "[entrypoint] server already registered as ${VICI_HOST}"
+  fi
 fi
 
 # Conferencing engine: this image builds ConfBridge only (app_meetme is NOT
 # compiled), so the server's conf_engine MUST be CONFBRIDGE or VICIdial would
 # try to use the missing MeetMe app. ADMIN_keepalive_ALL.pl (cron) then reads
 # conf_engine and generates confbridge-vicidial.conf from vicidial_confbridges.
-DBHOST=$(sed -n 's/^VARDB_server *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
-DBNAME=$(sed -n 's/^VARDB_database *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
-DBUSER=$(sed -n 's/^VARDB_user *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
-DBPASS=$(sed -n 's/^VARDB_pass *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')
 if [ -n "$VICI_HOST" ] && [ -n "$DBUSER" ]; then
   echo "[entrypoint] setting conf_engine=CONFBRIDGE for ${VICI_HOST}"
-  mysql -h "${DBHOST:-$VICI_DB}" -u"$DBUSER" -p"$DBPASS" "$DBNAME" \
-    -e "UPDATE servers SET conf_engine='CONFBRIDGE' WHERE server_ip='$VICI_HOST';" 2>&1 | tail -2 \
+  mysql_q "UPDATE servers SET conf_engine='CONFBRIDGE' WHERE server_ip='$VICI_HOST';" \
     || echo "[entrypoint] conf_engine UPDATE returned nonzero (continuing)"
 fi
 
