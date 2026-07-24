@@ -55,6 +55,15 @@ services:
     # No kmod available? See docker-compose.no-dahdi.yaml (not for production).
     devices:
       - /dev/dahdi/timer:/dev/dahdi/timer
+    volumes:
+      # Call recordings and voicemail. Asterisk writes recordings to
+      # /var/spool/asterisk/monitor and VICIdial's cron mixes/compresses them
+      # into monitorDONE/. Without this volume all of it lives in the container's
+      # writable layer and is destroyed every time the container is recreated --
+      # including on a routine `docker-compose up -d --build`.
+      # A named volume (not a bind mount) so the monitor* directory structure
+      # built into the image is used to initialise it rather than shadowed.
+      - asterisk_spool:/var/spool/asterisk
 
   web:
     container_name: vicidial-web
@@ -100,3 +109,4 @@ services:
 volumes:
   db_data:
   db_log:
+  asterisk_spool:

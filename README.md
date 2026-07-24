@@ -17,11 +17,10 @@ Per-release block — replace this line on each release (see the maintainer rele
 - 🐛 **<Headline>** — …
 -->
 
-**v0.2.1** — 🏷️ **Server-identity fix.** A patch on top of v0.2.0:
+**v0.2.2** — 🏷️ **Recordings survive restarts.** A data-loss fix:
 
-- 🐛 **A dialer could overwrite another server's registration.** It identified its own row in `servers` by taking the first one returned — fine for a single server, but two dialers sharing a database would rewrite each other's IP on every restart. Nodes now identify themselves by VICIdial's unique `server_id` (set `VICI_SERVER_ID`), and refuse to realign anything rather than guess when it's ambiguous. This was reachable in a single-server install too, just by adding a second server in the admin UI.
-
-This patches **v0.2.0**, which made **DAHDI timing the default** per VICIdial's ConfBridge guidance — so the dialer host must load the `dahdi` kernel module (no telephony hardware needed) and Docker Compose 2.24.4+ is required. See [`docs/INSTALL.md`](docs/INSTALL.md), or `docker-compose.no-dahdi.yaml` for hosts that can't.
+- 🐛 **Call recordings were destroyed every time the dialer container was recreated.** Nothing under `/var/spool/asterisk` was persisted, so recreating the container — including the documented `docker-compose up -d --build` upgrade — discarded every recording. It is now a named volume, covering voicemail too. Recordings still accumulate on the dialer: transferring them to a web or dedicated recordings server is not wired up yet.
+- 🧹 **Dropped a hardcoded `externip`** from the shipped `sip.conf` that pointed at an unrelated public IP. It was inert — this image builds Asterisk without `chan_sip` — but it read as live configuration.
 
 Full release notes and prior versions are in [CHANGELOG.md](CHANGELOG.md).
 

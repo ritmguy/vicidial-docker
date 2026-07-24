@@ -14,6 +14,17 @@ Deploys run from tags, never `main`.
 
 ### Fixed
 
+## [0.2.2] - 2026-07-24
+
+### Fixed
+
+- **Call recordings were destroyed whenever the dialer container was recreated.** Asterisk writes recordings to `/var/spool/asterisk/monitor` and VICIdial's cron mixes and compresses them into `monitorDONE/`, but nothing in that path was persisted — it lived in the container's writable layer. Recreating the container discarded all of it, and the documented way to upgrade (`docker-compose up -d --build`) recreates the container, so following the instructions destroyed the recordings. `/var/spool/asterisk` is now a named volume, which also covers voicemail. Note this only makes recordings durable on the dialer itself; transferring them to a web or dedicated recordings server, VICIdial's traditional arrangement, is still unwired.
+- Removed a hardcoded `externip` address from the shipped `sip.conf`, which pointed at an unrelated public IP. The file is inert in this image — Asterisk is built without `chan_sip` and `chan_pjsip` is the channel driver — but it read as live configuration. NAT for pjsip is configured with `external_media_address` / `external_signaling_address` on the transport instead.
+
+### Changed
+
+- `docs/USAGE.md` now documents the recordings volume, how to back it up, that recordings accumulate on the dialer because the transfer and cleanup cron jobs ship commented out, and that `docker-compose down -v` destroys recordings as well as the database.
+
 ## [0.2.1] - 2026-07-24
 
 ### Added
@@ -84,7 +95,8 @@ Deploys run from tags, never `main`.
 - Database credentials are no longer committed: the real `mysql.env` is gitignored, only `mysql.env.example` ships, and the previously exposed root password was rotated.
 - Configuration and SQL files are installed `0644` rather than world-writable.
 
-[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.1.0

@@ -144,16 +144,26 @@ A dialer rebuild recompiles Asterisk and takes a while. Changes to `entrypoint.s
 |---|---|---|
 | `db_data` | The VICIdial database | `/var/lib/mysql` |
 | `db_log` | MariaDB logs | `/var/log/mysql` |
+| `asterisk_spool` | **Call recordings** and voicemail | `/var/spool/asterisk` |
 
-Everything else lives in the images and is rebuilt from source, so the volumes above are the only state worth backing up.
+Everything else lives in the images and is rebuilt from source, so those three are the state worth backing up.
 
-**Destroying the database:**
+Recordings land in `/var/spool/asterisk/monitor`, and VICIdial's cron mixes and compresses them into `monitorDONE/` every few minutes. They stay on the dialer: the job that would transfer them elsewhere (`AST_CRON_audio_3_ftp.pl`) is commented out in the crontab by default, so **plan for disk growth** — the 7-day cleanup job is commented out too.
+
+Backing recordings up:
 
 ```sh
-docker-compose down -v          # ⚠️ deletes db_data and db_log — all data
+docker run --rm -v vicidial-docker_asterisk_spool:/data -v "$PWD":/backup alpine \
+  tar czf /backup/recordings-$(date +%F).tar.gz -C /data .
 ```
 
-The next `up` re-seeds a fresh VICIdial schema. This is the correct fix for a database that was initialised wrongly, and the wrong answer to almost everything else.
+**Destroying data:**
+
+```sh
+docker-compose down -v          # ⚠️ deletes db_data, db_log AND asterisk_spool
+```
+
+That removes the database *and every call recording*. The next `up` re-seeds a fresh VICIdial schema. It's the correct fix for a database that was initialised wrongly, and the wrong answer to almost everything else — take a backup first.
 
 ---
 
