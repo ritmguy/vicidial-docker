@@ -6,7 +6,6 @@
 # the conferencing engine, pick the timing source, then hand off to supervisord.
 # Passing VICI_HOST at runtime means an IP change is a restart, not a rebuild.
 set -e
-VICI_DB="${VICI_DB:-127.0.0.1}"
 # Prefer the runtime env; fall back to whatever was baked into astguiclient.conf.
 VICI_HOST="${VICI_HOST:-$(sed -n 's/^VARserver_ip *=> *//p' /etc/astguiclient.conf | tr -d ' \r\t')}"
 SEED_IP="10.10.10.15"
