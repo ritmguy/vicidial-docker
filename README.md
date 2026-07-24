@@ -17,10 +17,12 @@ Per-release block — replace this line on each release (see the maintainer rele
 - 🐛 **<Headline>** — …
 -->
 
-**v0.2.2** — 🏷️ **Recordings survive restarts.** A data-loss fix:
+**v0.3.0** — 🏷️ **Database locked down; roles selectable per host.** Security and the first step toward multi-host:
 
-- 🐛 **Call recordings were destroyed every time the dialer container was recreated.** Nothing under `/var/spool/asterisk` was persisted, so recreating the container — including the documented `docker-compose up -d --build` upgrade — discarded every recording. It is now a named volume, covering voicemail too. Recordings still accumulate on the dialer: transferring them to a web or dedicated recordings server is not wired up yet.
-- 🧹 **Dropped a hardcoded `externip`** from the shipped `sip.conf` that pointed at an unrelated public IP. It was inert — this image builds Asterisk without `chan_sip` — but it read as live configuration.
+- 🔐 **The database was reachable from the network with a default password.** MariaDB had no `bind-address`, so under host networking it listened on every interface, and wildcard `cron@'%'` / `root@'%'` accounts existed — meaning anything that could route to the host could log in as `cron`/`1234` and read your leads, agents and call metadata. It now binds to loopback, with loopback-only accounts. **Existing installs must restart, and should run the one-off cleanup in [docs/USAGE.md](docs/USAGE.md#database-exposure).**
+- 🧩 **Roles are selectable per host** — `docker-compose up -d dialer` starts only the dialer, `up -d db web` only those two, and a plain `up -d` still runs everything. Groundwork for splitting the stack across machines.
+- ⚙️ **`VICI_DB` is honoured at runtime** by the dialer and rewrites `VARDB_server`, so VICIdial's cron jobs and the entrypoint agree on which database to use. It was previously ignored.
+- ⚠️ **First-boot behaviour changed:** `web` no longer waits for the database, so a page load during the database's start-up window returns a PHP error rather than nothing listening. It clears once the database is ready.
 
 Full release notes and prior versions are in [CHANGELOG.md](CHANGELOG.md).
 
@@ -76,7 +78,7 @@ All three services share one `docker/Dockerfile`: a common `base` stage (Debian 
 ```sh
 git clone https://github.com/ritmguy/vicidial-docker.git
 cd vicidial-docker
-git fetch --tags && git checkout v0.2.0        # deploy from a tag, not main
+git fetch --tags && git checkout v0.3.0        # deploy from a tag, not main
 
 # 1. host: load the DAHDI timer (see docs/INSTALL.md for kernel requirements)
 sudo apt-get install -y dahdi-dkms dahdi linux-headers-$(uname -r)
@@ -113,7 +115,8 @@ Then open `http://<LOCAL_IP>/vicidial/admin.php` — the stock login is `6666` /
 │   │   └── html/
 │   └── mysql/
 │       ├── 00-init-grants.sh        # creates cron@localhost before the schema loads
-│       ├── my.cnf.mariadb
+│       ├── 03-lockdown.sh           # drops the wildcard DB accounts after it
+│       ├── my.cnf.mariadb           # binds MariaDB to loopback
 │       └── mysql.env.example        # copy to mysql.env (gitignored)
 └── docs/                            # INSTALL.md, USAGE.md
 ```
@@ -132,7 +135,8 @@ All three use host networking, so they bind directly to the host's interfaces.
 
 - Change the stock `6666` VICIdial login before exposing this anywhere.
 - `docker/mysql/mysql.env` holds real credentials and is gitignored — don't commit it.
-- Host networking puts MariaDB and SIP on every interface the host has. Firewall accordingly.
+- MariaDB binds to **loopback only**, with no wildcard accounts. Don't widen that casually: the `cron` password is VICIdial's default and has to be. See [Database exposure](docs/USAGE.md#database-exposure).
+- Host networking still puts **SIP and RTP** on every interface the host has. Firewall accordingly.
 - See the security notes in [docs/USAGE.md](docs/USAGE.md).
 
 ---

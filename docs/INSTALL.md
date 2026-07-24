@@ -79,7 +79,7 @@ Deploy from a **tag**, never from `main` — `main` is the active development li
 git clone https://github.com/ritmguy/vicidial-docker.git
 cd vicidial-docker
 git fetch --tags
-git checkout v0.2.0          # or the latest tag
+git checkout v0.3.0          # or the latest tag
 ```
 
 ---

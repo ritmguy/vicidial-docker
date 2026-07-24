@@ -8,6 +8,14 @@ Deploys run from tags, never `main`.
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
+## [0.3.0] - 2026-07-24
+
 ### Security
 
 - **The database was reachable from the network with a default password.** MariaDB had no `bind-address`, so it listened on `0.0.0.0`; combined with `network_mode: host` that meant every interface the host has. The MariaDB image had also created wildcard `cron@'%'` and `root@'%'` accounts, so any host able to route to the machine could log into the VICIdial database as `cron` with the documented default password `1234` — which grants access to lead data, agent accounts and call metadata. MariaDB now binds to `127.0.0.1`, and a new init step replaces the wildcard accounts with explicit loopback ones (`cron@127.0.0.1`, `cron@::1`). **An existing installation keeps its wildcard accounts**, because init scripts only run against an empty database volume: restarting applies the loopback bind, which is the control that matters, and `docs/USAGE.md` gives a one-off command to remove the accounts as well.
@@ -20,8 +28,6 @@ Deploys run from tags, never `main`.
 
 - `VICI_DB` is now honoured at runtime by the **dialer** and rewrites `VARDB_server` in `astguiclient.conf`, so VICIdial's cron jobs use the same database as the entrypoint. It was previously ignored, because the value baked into the image took precedence. The `web` service has no entrypoint and remains build-time only.
 - The `dialer` and `web` services no longer declare `depends_on: db`, so they can start on a host with no local database. The dialer entrypoint already waits for the database before using it. This also changes first-boot behaviour on every install: on a cold start, a page load during the database's start-up window now returns a PHP database error rather than nothing listening; it resolves once the database is ready.
-
-### Fixed
 
 ## [0.2.2] - 2026-07-24
 
@@ -104,7 +110,8 @@ Deploys run from tags, never `main`.
 - Database credentials are no longer committed: the real `mysql.env` is gitignored, only `mysql.env.example` ships, and the previously exposed root password was rotated.
 - Configuration and SQL files are installed `0644` rather than world-writable.
 
-[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.3.0
 [0.2.2]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.0
