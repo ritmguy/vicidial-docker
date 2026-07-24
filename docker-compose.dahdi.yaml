@@ -9,6 +9,13 @@
 #     sudo apt-get install -y dahdi-dkms dahdi linux-headers-$(uname -r)
 #     sudo modprobe dahdi dahdi_dummy      # creates /dev/dahdi/timer
 #
+# SECURE BOOT: dahdi is an out-of-tree module built by DKMS, so it is unsigned.
+# With Secure Boot enabled the kernel refuses to load it and modprobe fails with
+# "Operation not permitted" even as root (check: mokutil --sb-state, and dmesg
+# for "Lockdown: ... unsigned module loading is restricted"). Either disable
+# Secure Boot on the host or enrol a MOK key and sign the module. This affects
+# only this optional overlay -- the default timerfd timing needs no kernel module.
+#
 # Then bring the stack up with both files:
 #     export LOCAL_IP=<your-lan-ip>
 #     docker-compose -f docker-compose.yaml -f docker-compose.dahdi.yaml up -d
