@@ -10,5 +10,9 @@ release-notes/
 # Maintainer-only — not shared with collaborators/testers
 CLAUDE.local.md
 RELEASING.md
+
 # Brainstorming specs & implementation plans — private, never committed
 docs/superpowers/
+
+# Agent run scratch — not shared, not committed
+.superpowers/

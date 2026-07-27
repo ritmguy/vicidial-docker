@@ -107,6 +107,7 @@ Then open `http://<LOCAL_IP>/vicidial/admin.php` — the stock login is `6666` /
 │   ├── Dockerfile                   # one multi-stage build: base → dialer / web / db
 │   ├── dialer/
 │   │   ├── entrypoint.sh            # server registration, conf engine, timing
+│   │   ├── register-node.sh         # registers a second (or later) dialer's server record
 │   │   ├── crontab                  # VICIdial's cron jobs
 │   │   ├── supervisord.conf
 │   │   └── asterisk-conf/           # VICIdial's Asterisk configs
@@ -116,7 +117,8 @@ Then open `http://<LOCAL_IP>/vicidial/admin.php` — the stock login is `6666` /
 │   └── mysql/
 │       ├── 00-init-grants.sh        # creates cron@localhost before the schema loads
 │       ├── 03-lockdown.sh           # drops the wildcard DB accounts after it
-│       ├── my.cnf.mariadb           # binds MariaDB to loopback
+│       ├── grant-dialer.sh          # grants a remote dialer's address on a live db
+│       ├── my.cnf.mariadb           # binds MariaDB to loopback by default
 │       └── mysql.env.example        # copy to mysql.env (gitignored)
 └── docs/                            # INSTALL.md, USAGE.md
 ```

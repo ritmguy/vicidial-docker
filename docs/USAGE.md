@@ -10,6 +10,21 @@ export LOCAL_IP=192.0.2.10
 
 If you omit it, Compose substitutes an empty value and the dialer registers against the wrong address.
 
+A multi-host install also sets `VICI_DB`, `VICI_DB_BIND` and/or `VICI_SERVER_ID` — see the table below.
+
+---
+
+## Environment variables
+
+| Variable | Read by | Build-time or runtime | Wrong or unset |
+|---|---|---|---|
+| `LOCAL_IP` | **dialer**: build arg `VICI_HOST` *and* runtime env `VICI_HOST`. **web**: build arg only. | dialer: both — the entrypoint prefers the runtime value, so a change is a restart. web: build-time only — a change needs `--build`. | dialer registers the wrong address in `servers`; if unset, the entrypoint falls back to `VARserver_ip` from `astguiclient.conf`, and if that's empty too it logs `no DB credentials or server IP; skipping server registration` and writes nothing. `web`'s baked-in server address stays wrong until it's rebuilt. |
+| `VICI_DB` | **dialer**: build arg *and* runtime env. **web**: build arg only. | Same split as `LOCAL_IP`. | dialer/web can't reach the database, or reach the wrong one — and on `web` that only clears with a rebuild, not a restart. |
+| `VICI_DB_BIND` | **db** only | Runtime, via Compose `command:`. Restart, no rebuild. | An address this host doesn't have: `mariadbd` can't bind, so `db` crash-loops under `restart: unless-stopped` — **the whole stack goes down**, not just one dialer's connection. Unset defaults to `127.0.0.1`, identical to a single-host install. |
+| `VICI_SERVER_ID` | **dialer** only | Runtime env | Unset, with 2+ rows in `servers`: the dialer refuses to realign anything and logs why — safe, but the node's registration goes stale until corrected. Set but matching no row, at any row count: same refusal. |
+
+`db` and `web` don't read `VICI_SERVER_ID`; `db` doesn't read `LOCAL_IP` or `VICI_DB` at all.
+
 ---
 
 ## Everyday commands
@@ -40,14 +55,46 @@ The stock VICIdial login is user `6666`, password `1234`. Change it before expos
 
 ## Changing the server's IP address
 
-The server address is applied at **runtime**, so moving the host to a different network is a restart, not a rebuild:
+For `db` and `dialer`, the server address is applied at **runtime**, so moving one of those to a different network is a restart, not a rebuild. `web` is the exception — it bakes its address in at build time (see the table above), so moving it needs `--build`.
+
+### Single-host
 
 ```sh
 export LOCAL_IP=<new address>
-docker-compose up -d
+docker-compose up -d --build
 ```
 
-On start the dialer realigns the registered server from whatever address is currently in the database to the new one, updating both the database and `astguiclient.conf`.
+On start the dialer realigns the registered server from whatever address is currently in the database to the new one, updating both the database and `astguiclient.conf`. `db` and `dialer` only actually restart here — the `--build` is what makes `web` pick up the new address too; a plain `docker-compose up -d` would leave `web` still serving the old one.
+
+### Multi-host
+
+Moving a host in a split deployment touches more than `LOCAL_IP` — the database's bind address, a dialer's grant, a remote dialer's own `VICI_DB`, and any firewall rule are all pinned to specific addresses too. Missing one has different severity, so work through all four:
+
+**Dialer host moving.** `export LOCAL_IP=<new address>` and `docker-compose up -d` on that host — no `--build` needed, the dialer takes this at runtime. The dialer realigns its own `servers` row as above.
+
+**Database host moving, or `VICI_DB_BIND` otherwise stale.** This is the severe one: a `VICI_DB_BIND` naming an address the host no longer has means `mariadbd` cannot `bind()` to it, so **the database does not start at all**, and under `restart: unless-stopped` it crash-loops instead of failing once — the whole stack goes down, not just a remote dialer's connection. Fix `VICI_DB_BIND` in `.env` to an address this host actually has and restart:
+
+```sh
+docker-compose up -d db
+```
+
+Moving the database host also leaves every remote dialer pointed at a stale address. Update `VICI_DB` in each dialer's own `.env` to the database's new address and restart that dialer too — the entrypoint honours `VICI_DB` at runtime, so this is a restart, not a rebuild:
+
+```sh
+echo 'VICI_DB=<new-db-ip>' >> .env
+docker-compose up -d dialer
+```
+
+Miss this and the dialer sits FATAL after its 120s wait — the entrypoint's message names bind-address, grant and firewall as the usual causes, but none of those is what's actually wrong: the address it's dialing is simply gone.
+
+**A dialer's address changed.** `cron@'<old-ip>'` no longer matches connections from the new address, so the dialer gets `ERROR 1130` after the move. Grant the new address and drop the old one — see [Removing a grant](#removing-a-grant):
+
+```sh
+docker-compose exec db grant-dialer <new-ip>
+docker-compose exec db sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" -e "DROP USER \"cron\"@\"<old-ip>\";"'
+```
+
+**Firewall rule pinned to the old address.** A rule like `-s <old-ip> -j ACCEPT` (or the `ufw`/`firewalld` equivalent) needs updating to the new address too, or the dialer is unreachable at 3306 even with a correct grant. See [Database exposure](#database-exposure) for the rules themselves.
 
 ---
 
@@ -123,6 +170,8 @@ export LOCAL_IP=192.0.2.10
 docker-compose up -d --build
 ```
 
+On a role-limited host ([INSTALL.md §5a](INSTALL.md#5a-choose-which-roles-this-host-runs)), name your services here too — `docker-compose up -d --build db web` or `docker-compose up -d --build dialer` — the bare command above builds and starts every role, regardless of which ones this host normally runs.
+
 **Read the release notes first.** Most upgrades keep your data — the database initialises only against an empty volume, so an existing install is untouched. If a release changes the schema or the init scripts, it will say so explicitly, and applying it means either re-seeding (below, destructive) or migrating by hand.
 
 ---
@@ -133,6 +182,8 @@ docker-compose up -d --build
 docker-compose up -d --build              # rebuild everything that changed
 docker-compose build --no-cache dialer    # force a clean dialer rebuild
 ```
+
+On a role-limited host, name your services here too (`db web`, or `dialer`) — the bare `up -d --build` above still builds and starts every role on this host.
 
 A dialer rebuild recompiles Asterisk and takes a while. Changes to `entrypoint.sh` are cheap; changes to the base image or the Asterisk build are not.
 
@@ -175,7 +226,7 @@ docker-compose -f docker-compose.yaml -f docker-compose.no-dahdi.yaml up -d
 
 Falls back to Asterisk's timerfd timer so the stack runs on any kernel. Evaluation, CI and development only — not live calling.
 
-Pass **both** `-f` flags whenever you start or recreate containers (`up`, or a `restart` after changing configuration) — otherwise Compose reads only the base file and tries to re-add the DAHDI device, which fails on a host that hasn't got it. Commands that just act on already-running containers (`ps`, `logs`, `exec`) work fine without them.
+Pass **both** `-f` flags whenever you start or recreate containers — `up`, `run` (including `docker-compose run --rm dialer register-node ...`, which builds a fresh container from the service definition the same as `up` does), or a `restart` after changing configuration. Without both flags Compose reads only the base file and tries to re-add the DAHDI device, which fails on a host that hasn't got it. Commands that just act on already-running containers (`ps`, `logs`, `exec`) work fine without them.
 
 ---
 
@@ -294,6 +345,17 @@ docker-compose logs --tail=50 dialer
 | `ERROR 1130` | no account matches this dialer's host at all | `docker-compose exec db grant-dialer 192.0.2.11` |
 | `ERROR 1045` | an account matched, but the password differs | check `MYSQL_PASSWORD` matches on both ends |
 
+`grant-dialer` is a new executable added to an already-built `db` image — an existing install that hasn't rebuilt gets `exec: "grant-dialer": executable file not found in $PATH` instead. Rebuild first: `docker-compose up -d --build db`.
+
+**`db` itself keeps restarting (nothing in the stack works, not just one dialer)** — check its own log, not the dialer's:
+```sh
+docker-compose logs db --tail=20
+```
+`Can't start server: Bind on TCP/IP port` (or `Cannot assign requested address`) means `VICI_DB_BIND` names an address this host doesn't have — a typo, or the host moved. `mariadbd` never starts, so `db` crash-loops under `restart: unless-stopped`. Fix `VICI_DB_BIND` in `.env` to an address the host actually has (or remove it to fall back to `127.0.0.1`) and restart:
+```sh
+docker-compose up -d db
+```
+
 **Admin UI returns HTTP 500** — usually an incomplete database. Confirm the admin user exists:
 ```sh
 docker-compose exec -T dialer sh -c 'mysql --skip-ssl -h127.0.0.1 -ucron -p1234 asterisk -N -e "SELECT count(*) FROM vicidial_users WHERE user=\"6666\";"'
@@ -347,6 +409,16 @@ Grant each dialer individually — `grant-dialer` refuses wildcards on purpose:
 docker-compose exec db grant-dialer 192.0.2.11
 ```
 
+### Removing a grant
+
+This matters as much as adding one, when a dialer is decommissioned or renumbered — nothing does it automatically:
+
+```sh
+docker-compose exec db sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" -e "DROP USER \"cron\"@\"192.0.2.11\";"'
+```
+
+A grant left in place keeps working with `cron`'s default password for whatever machine next holds that address. Under DHCP that's not hypothetical — it's the next lease. Give the `db` host and every dialer host a **static address or a DHCP reservation**; `VICI_DB_BIND` and each `grant-dialer` account are pinned to specific addresses, and an address that moves under them needs both updated (see [Changing the server's IP address](#changing-the-servers-ip-address)).
+
 Add a firewall rule as well. Host networking means ordinary `INPUT` rules apply
 here, unlike Docker's bridge networking where published ports bypass them.
 Accept loopback **before** the drop: packets to `127.0.0.1` traverse `INPUT`
@@ -359,6 +431,25 @@ sudo iptables -I INPUT -i lo -j ACCEPT
 sudo iptables -I INPUT -p tcp --dport 3306 -s 192.0.2.11 -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 3306 -j DROP
 ```
+
+**Running `ufw` or `firewalld`?** Both insert their own jump targets ahead of where a plain `iptables -A INPUT ... -j DROP` appends. That means the rules above are a no-op for traffic those managers already accept — the operator believes 3306 is closed while it stays open, which is worse than not adding a rule at all. Use the manager's own rules instead. For `ufw`:
+
+```sh
+sudo ufw allow from 192.0.2.11 to any port 3306 proto tcp
+sudo ufw deny to any port 3306 proto tcp
+```
+
+(Add the `allow` before the `deny` — `ufw` evaluates rules in the order added, and the specific `allow` has to be checked first.) `ufw` must be **active** (`sudo ufw status`; enable with `sudo ufw enable`) for any of this to apply, and its own `ufw-before-input` chain already accepts `-i lo` — so the loopback caution above is already handled for `ufw` users. `firewalld` needs the same approach: a zone or rich-rule allow for the dialer's address, not a raw `iptables` append.
+
+**Verify it, regardless of which tool wrote the rule.** From a host you have not allowed through the firewall:
+
+```sh
+nc -vz -w 5 192.0.2.10 3306
+```
+
+That should time out and fail — `-w 5` caps the wait at 5 seconds instead of `nc`'s full default timeout. A successful connect means 3306 is reachable from somewhere it shouldn't be. Note this only tests the firewall: an address that's merely *ungranted* but still allowed through it connects fine at the TCP level and only fails afterwards with `ERROR 1130`, which `nc` reports as success.
+
+**Raw `iptables` rules don't survive a reboot** on their own — install `iptables-persistent` (Debian/Ubuntu) or your distribution's equivalent, or the rules above are gone on the next reboot and the database reverts to whatever `VICI_DB_BIND` alone allows.
 
 > **Known gap.** `cron`'s password is VICIdial's default `1234`, because it must
 > match what is baked into `astguiclient.conf`. Loopback-only binding used to be

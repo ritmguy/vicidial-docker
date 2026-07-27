@@ -131,6 +131,15 @@ export LOCAL_IP=192.0.2.10              # this shell only
 
 ## 5a. Choose which roles this host runs
 
+> **One machine running everything?** That's the common case — nothing to
+> configure in this section; continue straight to [§6. Build and
+> start](#6-build-and-start).
+>
+> **Splitting roles across machines?** Read both Multi-host subsections below,
+> in order: [database side](#multi-host-database-side) first, then [dialer
+> side](#multi-host-dialer-side) — a dialer can't start until the database
+> accepts it.
+
 A single machine runs all three roles, which is what most installs want and is
 what you get from a plain:
 
@@ -150,6 +159,12 @@ A dialer host must also be told where the database is, in `.env`:
 ```sh
 VICI_DB=192.0.2.10
 ```
+
+That `docker-compose up -d dialer` above is illustrative, and fine for a
+first dialer — but a second or later dialer has a decision to make before it
+ever starts, rather than running it as-is: the **[Multi-host: dialer
+side](#multi-host-dialer-side)** section below covers it, once the database
+side is done.
 
 ### Multi-host: database side
 
@@ -187,6 +202,23 @@ sudo iptables -I INPUT -i lo -j ACCEPT
 sudo iptables -I INPUT -p tcp --dport 3306 -s 192.0.2.11 -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 3306 -j DROP
 ```
+
+Running `ufw` or `firewalld` instead? A plain `iptables -A INPUT ... -j DROP`
+appends after those managers' own jump targets, so it's a no-op for traffic
+they already accept — 3306 looks closed but isn't. Use the manager's own
+rules. For `ufw` (add the `allow` first — rules are evaluated in the order
+added):
+
+```sh
+sudo ufw allow from 192.0.2.11 to any port 3306 proto tcp
+sudo ufw deny to any port 3306 proto tcp
+```
+
+Verify from a host you have not allowed through the firewall — `nc -vz -w 5
+192.0.2.10 3306` should time out and fail (`-w 5` caps the wait instead of
+`nc`'s full default timeout). And raw `iptables` rules don't survive a
+reboot without `iptables-persistent` (or your distribution's equivalent).
+See [Database exposure](USAGE.md#database-exposure) for the full reasoning.
 
 ### Multi-host: dialer side
 
@@ -247,6 +279,20 @@ node's.
 Every host must also keep its clock synchronised (`ntp` or `chrony`). VICIdial
 is sensitive to skew between dialers and the database.
 
+Give the database host and every dialer host a **static address or a DHCP
+reservation**. `VICI_DB_BIND` and each `grant-dialer` account are pinned to a
+specific address; if one changes under DHCP, the next machine to hold that
+address inherits the old grant and the old dialer needs re-granting and
+re-pointing — see [Removing a grant](USAGE.md#removing-a-grant) and
+[Changing the server's IP address](USAGE.md#changing-the-servers-ip-address).
+
+That's the full multi-host setup for this host — you've already built and
+started whatever roles it runs, following the sequence above. [§6. Build and
+start](#6-build-and-start) and [§7. Verify the
+install](#7-verify-the-install) below are the general build and verify steps
+every install uses; on a role-limited host, keep naming your services there
+too, rather than running the bare commands shown.
+
 ---
 
 ## 6. Build and start
@@ -255,7 +301,9 @@ is sensitive to skew between dialers and the database.
 docker-compose up -d --build
 ```
 
-A host running only a subset of roles (§5a) should name its services here too, e.g. `docker-compose up -d --build db web`, or the bare command above builds and starts every role regardless.
+A host running only a subset of roles (§5a) should name its services here too — e.g. `docker-compose up -d --build db web` on the database host, `docker-compose up -d --build dialer` on a dialer host — or the bare command above builds and starts every role regardless.
+
+**Multi-host database host:** the bare command above also tries to build and start `dialer`, which maps a DAHDI device (§2) that a database-only host usually doesn't have — so it fails at container creation instead of just doing unwanted work. Name your services (`db web`) here.
 
 **Multi-host dialer hosts:** don't run `docker-compose up -d --build dialer` here for a second (or later) dialer. That both builds and starts it in one step, skipping the register-before-start ordering §5a walks through — and starting an unregistered dialer before it's registered can rewrite an existing dialer's registration. Follow §5a's build-then-register-then-start sequence instead.
 
@@ -269,15 +317,24 @@ docker-compose logs -f
 
 ## 7. Verify the install
 
+On a single host running everything, every check below applies. On a
+role-limited host (§5a), each check names the role it needs — skip the ones
+for roles that aren't here. That includes the two **Multi-host** checks at
+the end: the first reads the `dialer` container's logs (dialer host only),
+the second queries the `db` container directly (database host only).
+
 **Services are up and the database is healthy:**
 
 ```sh
 docker-compose ps
 ```
 
-All three (`vicidial-db`, `vicidial-dialer`, `vicidial-web`) should be `Up`, with `db` showing `(healthy)`.
+Expect `Up` for whichever services this host runs — all three
+(`vicidial-db`, `vicidial-dialer`, `vicidial-web`) on a single-host install,
+or just the ones you named in §5a on a role-limited host — with `db` showing
+`(healthy)` wherever it's present.
 
-**The dialer picked up DAHDI timing:**
+**The dialer picked up DAHDI timing (dialer host):**
 
 ```sh
 docker-compose exec dialer asterisk -rx "timing test"
@@ -291,7 +348,7 @@ Using the 'DAHDI' timing module for this test.
 
 If it says `timerfd`, the device isn't reaching the container — check §2.
 
-**Conferencing is configured:**
+**Conferencing is configured (dialer host):**
 
 ```sh
 docker-compose exec dialer asterisk -rx "confbridge show profile bridges"
@@ -299,14 +356,14 @@ docker-compose exec dialer asterisk -rx "confbridge show profile bridges"
 
 `vici_agent_bridge` should be listed. It's generated by VICIdial's keepalive cron within a minute of first start.
 
-**The web interfaces respond:**
+**The web interfaces respond (web host):**
 
 | | |
 |---|---|
 | Admin | `http://<LOCAL_IP>/vicidial/admin.php` |
 | Agent | `http://<LOCAL_IP>/agc/vicidial.php` |
 
-Default VICIdial login is user **`6666`**, password **`1234`**. **Change it before putting this on a reachable network.**
+Default VICIdial login is user **`6666`**, password **`1234`**. **Change it before putting this on a reachable network.** Neither URL is reachable locally from a dialer-only host — check them from the web host, or over the network at its address.
 
 **Multi-host: the dialer reached the remote database.**
 

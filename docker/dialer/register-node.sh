@@ -12,12 +12,17 @@
 # is whose.
 #
 # A VICIdial server is not one row: the seed creates ~300 rows across five
-# tables, and BOTH conference tables are keyed by server_ip. A servers row on
-# its own produces a dialer that registers, appears healthy, and then fails the
-# first time an agent tries to conference. So the conference extension list is
-# COPIED from a server that already has one -- it therefore always matches
-# whatever VICIdial's own schema seeded, instead of a hardcoded range that could
-# drift when the upstream seed changes.
+# tables, and BOTH conference tables are keyed by server_ip. This script copies
+# four of them -- servers, server_updater, conferences and vicidial_conferences.
+# The fifth, `phones` (the gs102/callin demo entries), is deliberately NOT
+# copied: those are demo extensions, not per-node configuration, so a new node
+# correctly starts with none rather than inheriting someone else's phones.
+#
+# A servers row on its own produces a dialer that registers, appears healthy,
+# and then fails the first time an agent tries to conference. So the conference
+# extension list is COPIED from a server that already has one -- it therefore
+# always matches whatever VICIdial's own schema seeded, instead of a hardcoded
+# range that could drift when the upstream seed changes.
 set -eu
 
 DBHOST=""

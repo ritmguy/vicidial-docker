@@ -17,9 +17,10 @@ Deploys run from tags, never `main`.
 
 ### Changed
 
-- **Existing installs must rebuild to use `grant-dialer` or `register-node`.** Both are new executables added to already-built images, and Compose only builds an image that doesn't exist yet — so a plain `docker-compose up -d db web` / `up -d dialer` on an existing install leaves the old images in place and skips them silently. Rebuild explicitly: `docker-compose up -d --build db web` for `grant-dialer` and `VICI_DB_BIND` support, `docker-compose up -d --build dialer` for `register-node` and the entrypoint's new registration logic. Without the rebuild, `grant-dialer` fails with `exec: "grant-dialer": executable file not found in $PATH`.
+- **Existing installs must rebuild to use `grant-dialer` or `register-node`.** Both are new executables added to already-built images, and Compose only builds an image that doesn't exist yet — so a plain `docker-compose up -d db web` / `up -d dialer` on an existing install leaves the old images in place and skips them silently. Rebuild explicitly: `docker-compose up -d --build db web` for `grant-dialer`, `docker-compose up -d --build dialer` for `register-node` and the entrypoint's new registration logic. Without the rebuild, `grant-dialer` fails with `exec: "grant-dialer": executable file not found in $PATH`.
 - The dialer's unreachable-database message now names the three usual causes — bind address, missing grant, firewall — instead of one generic line.
 - `README.md` and `docs/USAGE.md` no longer present loopback-only binding as the mitigation for VICIdial's default `cron` password: that stopped being true once `VICI_DB_BIND` can name a LAN address.
+- The `db` service's Compose `command:` now overrides any `bind-address` hand-edited into `docker/mysql/my.cnf.mariadb` on every start — the previous release's own comment in that file invited exactly that edit. The override is fail-safe (an unset `VICI_DB_BIND` reverts to loopback), but a remote dialer relying on a hand-edited bind-address stops connecting on the next `docker-compose up -d db`, with nothing in the logs pointing at why.
 
 ### Fixed
 
