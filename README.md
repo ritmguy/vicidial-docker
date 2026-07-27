@@ -135,7 +135,7 @@ All three use host networking, so they bind directly to the host's interfaces.
 
 - Change the stock `6666` VICIdial login before exposing this anywhere.
 - `docker/mysql/mysql.env` holds real credentials and is gitignored — don't commit it.
-- MariaDB binds to **loopback only**, with no wildcard accounts. Don't widen that casually: the `cron` password is VICIdial's default and has to be. See [Database exposure](docs/USAGE.md#database-exposure).
+- MariaDB binds to **loopback only by default**, with no wildcard accounts. Multi-host installs widen this to one named LAN address via `VICI_DB_BIND`, with per-dialer grants — never `0.0.0.0`. The `cron` password is VICIdial's default and has to be, so a network-bound database is protected only by those grants and your firewall: put it on a trusted segment. See [Database exposure](docs/USAGE.md#database-exposure).
 - Host networking still puts **SIP and RTP** on every interface the host has. Firewall accordingly.
 - See the security notes in [docs/USAGE.md](docs/USAGE.md).
 

@@ -10,7 +10,16 @@ Deploys run from tags, never `main`.
 
 ### Added
 
+- `VICI_DB_BIND` sets the addresses MariaDB listens on, so a database can serve remote dialers without a rebuild. Defaults to `127.0.0.1`, unchanged for a single-host install.
+- `grant-dialer <ip>` in the `db` image adds a scoped `cron@'<ip>'` account on a running container — `docker-compose exec db grant-dialer 192.0.2.11` — since the database's own init scripts only run once, against an empty volume. Refuses wildcards.
+- `register-node --server-id=<id> [--description=<text>] [--server-ip=<ip>]` in the `dialer` image registers a second or subsequent dialer, creating its rows in `servers`, `server_updater`, `conferences` and `vicidial_conferences`. The first dialer needs no such step — it adopts the database's single seed row automatically. Refuses a duplicate `server_id` or `server_ip`.
+- Multi-host installation and operation documented in `docs/INSTALL.md` and `docs/USAGE.md`.
+
 ### Changed
+
+- **Existing installs must rebuild to use `grant-dialer` or `register-node`.** Both are new executables added to already-built images, and Compose only builds an image that doesn't exist yet — so a plain `docker-compose up -d db web` / `up -d dialer` on an existing install leaves the old images in place and skips them silently. Rebuild explicitly: `docker-compose up -d --build db web` for `grant-dialer` and `VICI_DB_BIND` support, `docker-compose up -d --build dialer` for `register-node` and the entrypoint's new registration logic. Without the rebuild, `grant-dialer` fails with `exec: "grant-dialer": executable file not found in $PATH`.
+- The dialer's unreachable-database message now names the three usual causes — bind address, missing grant, firewall — instead of one generic line.
+- `README.md` and `docs/USAGE.md` no longer present loopback-only binding as the mitigation for VICIdial's default `cron` password: that stopped being true once `VICI_DB_BIND` can name a LAN address.
 
 ### Fixed
 

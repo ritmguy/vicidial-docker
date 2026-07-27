@@ -151,9 +151,101 @@ A dialer host must also be told where the database is, in `.env`:
 VICI_DB=192.0.2.10
 ```
 
-> Multi-host deployment is not complete yet: remote database grants and node
-> registration are still to come. On a single machine, all three roles together
-> is the supported arrangement.
+### Multi-host: database side
+
+On the database host, list the addresses MariaDB should listen on — loopback
+**plus** the one LAN address dialers reach it on:
+
+```sh
+echo 'VICI_DB_BIND=127.0.0.1,192.0.2.10' >> .env
+docker-compose up -d --build db web
+```
+
+Keep `127.0.0.1` in the list, or the local `web` role loses its connection.
+Never use `0.0.0.0`: with `network_mode: host` that is every interface the host
+has, including VPN and Docker bridges. No spaces around the comma — Compose
+splits a plain `command:` scalar on whitespace, so `127.0.0.1, 192.0.2.10`
+(with a space) reaches `mariadbd` as two separate arguments and it refuses to
+start. See [Database exposure](USAGE.md#database-exposure) for more.
+
+Then grant each dialer, one address at a time:
+
+```sh
+docker-compose exec db grant-dialer 192.0.2.11
+```
+
+Restrict 3306 as well. Because `db` uses `network_mode: host`, ordinary `INPUT`
+rules apply — unlike Docker's usual bridge networking, where published ports
+bypass `INPUT` and firewall rules appear to be ignored. Accept loopback
+**before** the drop: packets to `127.0.0.1` traverse `INPUT` too, so a bare
+trailing DROP also cuts the local `web` → `db` connection — a symptom that's
+easy to misattribute, since `db` still shows `(healthy)` while the web UI
+throws PHP errors:
+
+```sh
+sudo iptables -I INPUT -i lo -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 3306 -s 192.0.2.11 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 3306 -j DROP
+```
+
+### Multi-host: dialer side
+
+Each dialer host needs its own address and the database's, in `.env`, before
+its first build. Build only for now — **do not start it yet**, that depends on
+whether this is the first dialer or not:
+
+```sh
+./generate-local-ip-env.sh          # LOCAL_IP=192.0.2.11
+echo 'VICI_DB=192.0.2.10' >> .env
+docker-compose build dialer          # build only -- do NOT start it yet
+```
+
+Both values are also honoured at runtime by the dialer (see [Changing the
+server's IP address](USAGE.md#changing-the-servers-ip-address)), so a later
+change is a restart, not necessarily a rebuild — but get them right from the
+start anyway, to avoid a transient mismatch on first boot.
+
+Now pick the path that matches this dialer — **read this before running `up`**:
+
+**The first dialer:**
+
+```sh
+docker-compose up -d dialer
+```
+
+Nothing more is needed. A fresh database contains exactly one server row, and
+the entrypoint adopts it and corrects its IP automatically.
+
+**Each dialer after the first — register it, THEN start it, in this order:**
+
+```sh
+docker-compose run --rm dialer register-node --server-id=dialer2 --description="Dialer 2"
+echo 'VICI_SERVER_ID=dialer2' >> .env
+docker-compose up -d dialer
+```
+
+> **Do not run `docker-compose up -d dialer` for a second (or later) dialer
+> before it's registered.** The entrypoint only refuses to guess when it sees
+> **two or more** rows in `servers` — with just one row present (dialer 1's)
+> and `VICI_SERVER_ID` unset, an unregistered dialer 2 looks, from the
+> database's point of view, identical to a first dialer starting for the first
+> time. It adopts that single row exactly as dialer 1 did, rewriting dialer
+> 1's `server_id`, IP and its ~300 dependent rows (across `servers`,
+> `server_updater`, `conferences` and `vicidial_conferences`) onto itself.
+> `register-node` then refuses to register the correct address for dialer 1,
+> because that address is now sitting on the row dialer 2 just stole. Both
+> dialers end up broken, and recovering means repairing the database by hand.
+> Registering first is what avoids this: it gives dialer 2 its own row before
+> it ever starts, so there is no longer a single ambiguous row for it to adopt.
+
+`register-node` refuses to overwrite an existing `server_id` or an
+already-registered address, so re-running it is safe. Without
+`VICI_SERVER_ID`, a dialer sharing a database with others will refuse to
+correct any registration — deliberately, rather than risk overwriting another
+node's.
+
+Every host must also keep its clock synchronised (`ntp` or `chrony`). VICIdial
+is sensitive to skew between dialers and the database.
 
 ---
 
@@ -164,6 +256,8 @@ docker-compose up -d --build
 ```
 
 A host running only a subset of roles (§5a) should name its services here too, e.g. `docker-compose up -d --build db web`, or the bare command above builds and starts every role regardless.
+
+**Multi-host dialer hosts:** don't run `docker-compose up -d --build dialer` here for a second (or later) dialer. That both builds and starts it in one step, skipping the register-before-start ordering §5a walks through — and starting an unregistered dialer before it's registered can rewrite an existing dialer's registration. Follow §5a's build-then-register-then-start sequence instead.
 
 The first run compiles Asterisk, so give it time. Watch progress with:
 
@@ -213,6 +307,22 @@ docker-compose exec dialer asterisk -rx "confbridge show profile bridges"
 | Agent | `http://<LOCAL_IP>/agc/vicidial.php` |
 
 Default VICIdial login is user **`6666`**, password **`1234`**. **Change it before putting this on a reachable network.**
+
+**Multi-host: the dialer reached the remote database.**
+
+```sh
+docker-compose logs dialer | grep -E 'waiting for DB|aligning|already registered'
+```
+
+If it instead prints a FATAL after 120s, the message lists the three usual
+causes in the order worth checking — or jump straight to the one matching your
+symptom in [USAGE.md's troubleshooting section](USAGE.md#troubleshooting).
+
+**Multi-host: the database is listening where you expect — and nowhere else.**
+
+```sh
+docker-compose exec db sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT @@bind_address;"'
+```
 
 ---
 

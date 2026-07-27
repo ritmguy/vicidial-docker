@@ -6,6 +6,21 @@ services:
       context: './docker'
       dockerfile: 'Dockerfile'
       target: db
+    # Addresses MariaDB listens on. Overrides the bind-address baked into
+    # /etc/mysql/conf.d/my.cnf at build time, so changing it is a restart rather
+    # than a rebuild -- matching how the dialer takes VICI_HOST at runtime.
+    #
+    # The default is loopback only, identical to v0.3.0: an all-in-one install
+    # shares one network namespace and needs nothing else.
+    #
+    # A database serving REMOTE dialers sets this in .env to loopback PLUS the
+    # one LAN address dialers reach it on:
+    #     VICI_DB_BIND=127.0.0.1,192.0.2.10
+    # Keep 127.0.0.1 in the list or the local `web` role loses its connection.
+    # Do NOT use 0.0.0.0 -- with network_mode: host that is every interface the
+    # host has, including VPN and docker bridges. See "Database exposure" in
+    # docs/USAGE.md.
+    command: --bind-address=${VICI_DB_BIND:-127.0.0.1}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-S", "/tmp/mysql.sock"]

@@ -78,6 +78,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends dahdi-source
 COPY dialer/supervisord.conf /etc/supervisor/conf.d/
 COPY dialer/start_asterisk_boot.pl /usr/share/astguiclient/trunk/
 COPY --chmod=0755 dialer/entrypoint.sh /entrypoint.sh
+COPY --chmod=0755 dialer/register-node.sh /usr/local/bin/register-node
 RUN chmod +x /usr/share/astguiclient/trunk/*.pl
 COPY --chmod=0644 ./dialer/asterisk-conf/* /etc/asterisk/
 
@@ -113,4 +114,8 @@ COPY --from=base /usr/share/astguiclient/trunk/extras/first_server_install.sql /
 # 03- runs last: drops the wildcard cron@'%' / root@'%' accounts the entrypoint
 # and schema load require, once they are no longer needed.
 COPY --chmod=0755 mysql/03-lockdown.sh /docker-entrypoint-initdb.d/03-lockdown.sh
+# Operator command, NOT an init script: adding a dialer happens long after the
+# data directory exists, and /docker-entrypoint-initdb.d/ only runs when it
+# doesn't. On PATH so it is `docker-compose exec db grant-dialer <ip>`.
+COPY --chmod=0755 mysql/grant-dialer.sh /usr/local/bin/grant-dialer
 EXPOSE 3306

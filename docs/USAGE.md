@@ -208,7 +208,20 @@ VICI_SERVER_ID=dialer1 docker-compose up -d dialer
 
 The fix is to set the variable to the `server_id` shown in the admin UI under Admin → Servers.
 
-> Note: this makes multi-server *safe*, not *supported*. A full multi-dialer topology — remote database access, credential distribution, shared recordings — is not covered by this stack yet.
+Registering a node after the first is a one-shot command on that host:
+
+```sh
+docker-compose run --rm dialer register-node --server-id=dialer2 --description="Dialer 2"
+```
+
+It creates the node's complete server record — not just the `servers` row, but
+the per-server conference extensions too, without which the dialer registers
+successfully and then fails the first time an agent tries to conference. It
+refuses to overwrite an existing `server_id` or an already-registered address.
+
+> Note: remote database access and node registration are supported (see
+> [INSTALL.md](INSTALL.md#5a-choose-which-roles-this-host-runs)). **Shared
+> recordings are not yet** — each dialer keeps its recordings locally.
 
 ---
 
@@ -255,7 +268,11 @@ All three services use host networking, so they bind directly to the host's inte
 | 8089 tcp | Asterisk WebSocket / WSS |
 | 3306 | MariaDB |
 
-Host networking means **the database port is reachable on every interface the host has.** Firewall it, or bind it to the interface you intend, before putting this on an untrusted network.
+Host networking means most of these ports are reachable on every interface the
+host has, with no Compose port-mapping step in between — firewall accordingly
+before putting this on an untrusted network. MariaDB is the exception: it
+binds to loopback only by default and widens only when you set
+`VICI_DB_BIND` — see [Database exposure](#database-exposure).
 
 ---
 
@@ -267,6 +284,15 @@ docker-compose logs --tail=50 dialer
 ```
 
 **Dialer can't reach the database** — check `db` is healthy (`docker-compose ps`), and that `MYSQL_USER`/`MYSQL_PASSWORD` in `mysql.env` match VICIdial's `cron`/`1234`. A mismatch only shows up as connection failures in the dialer, because the database itself starts perfectly.
+
+**Dialer on a separate host can't reach the database** — after a 120s wait the entrypoint prints a FATAL naming three usual causes. The exact failure text tells you which one:
+
+| Failure | Meaning | Fix |
+|---|---|---|
+| `connection refused` | nothing is listening on that address | add it to `VICI_DB_BIND`, then `docker-compose up -d db` |
+| `timeout` / no route | a firewall is dropping the packets | open 3306 to this dialer's address |
+| `ERROR 1130` | no account matches this dialer's host at all | `docker-compose exec db grant-dialer 192.0.2.11` |
+| `ERROR 1045` | an account matched, but the password differs | check `MYSQL_PASSWORD` matches on both ends |
 
 **Admin UI returns HTTP 500** — usually an incomplete database. Confirm the admin user exists:
 ```sh
@@ -285,11 +311,61 @@ docker-compose up -d --build web
 
 ## Database exposure
 
-MariaDB listens on **loopback only** (`bind-address=127.0.0.1` in `docker/mysql/my.cnf.mariadb`). All three roles share the host's network namespace, so they reach it over `127.0.0.1` and nothing else is needed.
+MariaDB listens on **loopback only by default** (`bind-address=127.0.0.1`), and all
+three roles on one host reach it over `127.0.0.1`.
 
-This matters because of `network_mode: host`: without that setting MariaDB would listen on `0.0.0.0`, which here means every interface the host has. The accounts are also restricted to loopback — `cron@127.0.0.1`, `cron@::1`, `cron@localhost` and `root@localhost`, with no wildcard `@'%'` accounts.
+This matters because of `network_mode: host`: without a bind address MariaDB
+would listen on `0.0.0.0`, which here means every interface the host has. The
+accounts are restricted to loopback too — `cron@127.0.0.1`, `cron@::1`,
+`cron@localhost` and `root@localhost`, with no wildcard `@'%'` accounts.
 
-Note that `cron`'s password is VICIdial's default `1234`, because it has to match what is baked into `astguiclient.conf`. That is only acceptable while the database is unreachable from the network — so do not widen `bind-address` casually.
+**Exposing the database to remote dialers.** Set `VICI_DB_BIND` in `.env` to
+loopback plus the single LAN address dialers use, and restart `db`:
+
+```sh
+echo 'VICI_DB_BIND=127.0.0.1,192.0.2.10' >> .env
+docker-compose up -d --build db
+```
+
+No spaces around the comma. Compose splits a plain `command:` scalar on
+whitespace, so `VICI_DB_BIND=127.0.0.1, 192.0.2.10` (note the space) reaches
+`mariadbd` as two separate arguments instead of one — an argument list it
+rejects, so the database fails to start.
+
+Listing addresses explicitly is deliberate. `0.0.0.0` plus a firewall would also
+expose the database on every VPN interface and Docker bridge, leaving firewall
+correctness as the only control. Naming one address means the others are never
+listening at all. Verify:
+
+```sh
+docker-compose exec db sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT @@bind_address;"'
+```
+
+Grant each dialer individually — `grant-dialer` refuses wildcards on purpose:
+
+```sh
+docker-compose exec db grant-dialer 192.0.2.11
+```
+
+Add a firewall rule as well. Host networking means ordinary `INPUT` rules apply
+here, unlike Docker's bridge networking where published ports bypass them.
+Accept loopback **before** the drop: packets to `127.0.0.1` traverse `INPUT`
+too, so a bare trailing DROP also cuts the local `web` → `db` connection — a
+symptom that's easy to misattribute, since `db` still shows `(healthy)` while
+the web UI throws PHP errors:
+
+```sh
+sudo iptables -I INPUT -i lo -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 3306 -s 192.0.2.11 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 3306 -j DROP
+```
+
+> **Known gap.** `cron`'s password is VICIdial's default `1234`, because it must
+> match what is baked into `astguiclient.conf`. Loopback-only binding used to be
+> what made that acceptable, and once you set `VICI_DB_BIND` it no longer is.
+> Until credential rotation ships, treat a LAN-bound database as protected only
+> by its per-address grants and your firewall — so bind it to a trusted network
+> segment, and never to an interface reachable from the internet.
 
 **Existing installations need a one-off cleanup.** The database's init scripts only run against an empty volume, so an install created before this change still has the wildcard accounts. Restarting picks up the loopback `bind-address`, which is the control that matters, but to remove the accounts too:
 
@@ -308,6 +384,6 @@ Substitute your own `MYSQL_PASSWORD` if you changed it from `1234`. Create the `
 
 - Change the VICIdial `6666` login, and the `cron` database password (which must be changed in both `mysql.env` and VICIdial's configuration together).
 - Never commit `docker/mysql/mysql.env` — it's gitignored for that reason.
-- Host networking exposes MariaDB and SIP on all interfaces; firewall accordingly.
+- Host networking exposes SIP on all interfaces by default. MariaDB stays loopback-only unless you set `VICI_DB_BIND` for a multi-host install — see [Database exposure](#database-exposure). Firewall accordingly either way.
 - `tty: true` on the web service is a development convenience; comment it out in production.
 - Rebuild periodically to pick up base-image security updates.

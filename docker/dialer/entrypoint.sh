@@ -55,9 +55,46 @@ done
 
 if ! mysqladmin $MYSQL_OPTS ping -h "$DBHOST" --silent 2>/dev/null; then
   echo "[entrypoint] FATAL: database ${DBHOST}:3306 unreachable after 120s. Exiting so Docker restarts and retries."
-  echo "[entrypoint] If this is a dialer-only host, check VICI_DB points at the database host and that it accepts remote connections."
+  echo "[entrypoint] On a dialer-only host there are three usual causes, in the order"
+  echo "[entrypoint] worth checking. On the DATABASE host:"
+  echo "[entrypoint]   1. bind-address does not include its LAN address."
+  echo "[entrypoint]      Set VICI_DB_BIND=127.0.0.1,<db-lan-ip> in .env and restart db."
+  echo "[entrypoint]   2. no grant for this dialer's address."
+  echo "[entrypoint]      Run: docker-compose exec db grant-dialer <this-dialer-ip>"
+  echo "[entrypoint]   3. a firewall is blocking 3306 from this dialer."
+  echo "[entrypoint] Isolate which one with, from THIS host:"
+  echo "[entrypoint]   docker run --rm --network host mariadb:10.11.13-jammy \\"
+  echo "[entrypoint]     mariadb --skip-ssl -h ${DBHOST} -u<user> -p<pass> -e 'SELECT 1;'"
+  echo "[entrypoint] Read the failure precisely:"
+  echo "[entrypoint]   timeout / no route  -> cause 1 or 3 (bind address, or firewall)"
+  echo "[entrypoint]   ERROR 1130          -> cause 2, no account for this host at all"
+  echo "[entrypoint]   ERROR 1045          -> cause 2, account exists but password differs"
   exit 1
 fi
+
+# ---- one-shot subcommands -------------------------------------------------
+# `docker-compose run --rm dialer register-node ...` arrives here with the
+# database host resolved, validated and confirmed reachable -- exactly the state
+# a one-shot command needs, and the reason dispatch sits after the wait loop
+# rather than at the top of the file.
+#
+# Everything BELOW this point is the long-running server path: IP alignment,
+# conf_engine, timing setup and supervisord. None of it may run for a one-shot
+# command, so these branches exec and never return.
+#
+# With no arguments $1 is empty and the file continues exactly as before -- the
+# normal `docker-compose up -d dialer` path is unchanged.
+case "${1:-}" in
+  register-node)
+    shift
+    exec /usr/local/bin/register-node --db-host="$DBHOST" "$@" ;;
+  '')
+    : ;;   # normal server start-up; fall through
+  *)
+    echo "[entrypoint] unknown command '${1}'."
+    echo "[entrypoint] Supported: register-node"
+    exit 1 ;;
+esac
 
 # Work out WHICH server row belongs to this node before touching anything.
 #

@@ -14,7 +14,9 @@ local-infile=1
 # container shares the host's networking, that means every interface the host
 # has, reachable by anything that can route to it.
 #
-# To allow remote dialers later, set this to the address they should reach the
-# database on and grant only those hosts. Do not simply switch to 0.0.0.0 --
-# see "Database exposure" in docs/USAGE.md.
+# This is the BUILD-TIME default. It is overridden at runtime by the db
+# service's `command:` in docker-compose.yaml, which reads VICI_DB_BIND from
+# .env. To allow remote dialers, set VICI_DB_BIND there -- do not edit this
+# file, and do not simply switch to 0.0.0.0. See "Database exposure" in
+# docs/USAGE.md.
 bind-address=127.0.0.1
