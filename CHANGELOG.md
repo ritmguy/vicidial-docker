@@ -10,6 +10,14 @@ Deploys run from tags, never `main`.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.4.0] - 2026-07-27
+
+### Added
+
 - `VICI_DB_BIND` sets the addresses MariaDB listens on, so a database can serve remote dialers without a rebuild. Defaults to `127.0.0.1`, unchanged for a single-host install.
 - `grant-dialer <ip>` in the `db` image adds a scoped `cron@'<ip>'` account on a running container — `docker-compose exec db grant-dialer 192.0.2.11` — since the database's own init scripts only run once, against an empty volume. Refuses wildcards.
 - `register-node --server-id=<id> [--description=<text>] [--server-ip=<ip>]` in the `dialer` image registers a second or subsequent dialer, creating its rows in `servers`, `server_updater`, `conferences` and `vicidial_conferences`. The first dialer needs no such step — it adopts the database's single seed row automatically. Refuses a duplicate `server_id` or `server_ip`.
@@ -21,8 +29,6 @@ Deploys run from tags, never `main`.
 - The dialer's unreachable-database message now names the three usual causes — bind address, missing grant, firewall — instead of one generic line.
 - `README.md` and `docs/USAGE.md` no longer present loopback-only binding as the mitigation for VICIdial's default `cron` password: that stopped being true once `VICI_DB_BIND` can name a LAN address.
 - The `db` service's Compose `command:` now overrides any `bind-address` hand-edited into `docker/mysql/my.cnf.mariadb` on every start — the previous release's own comment in that file invited exactly that edit. The override is fail-safe (an unset `VICI_DB_BIND` reverts to loopback), but a remote dialer relying on a hand-edited bind-address stops connecting on the next `docker-compose up -d db`, with nothing in the logs pointing at why.
-
-### Fixed
 
 ## [0.3.0] - 2026-07-24
 
@@ -120,7 +126,8 @@ Deploys run from tags, never `main`.
 - Database credentials are no longer committed: the real `mysql.env` is gitignored, only `mysql.env.example` ships, and the previously exposed root password was rotated.
 - Configuration and SQL files are installed `0644` rather than world-writable.
 
-[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ritmguy/vicidial-docker/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.3.0
 [0.2.2]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ritmguy/vicidial-docker/releases/tag/v0.2.1

@@ -165,7 +165,7 @@ Deploy from tags, never `main`.
 
 ```sh
 git fetch --tags
-git checkout v0.3.0
+git checkout v0.4.0
 export LOCAL_IP=192.0.2.10
 docker-compose up -d --build
 ```

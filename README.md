@@ -17,12 +17,13 @@ Per-release block — replace this line on each release (see the maintainer rele
 - 🐛 **<Headline>** — …
 -->
 
-**v0.3.0** — 🏷️ **Database locked down; roles selectable per host.** Security and the first step toward multi-host:
+**v0.4.0** — 🏷️ **A dialer can now run on its own host, against a remote database.** Multi-host installs, without changing the single-host default:
 
-- 🔐 **The database was reachable from the network with a default password.** MariaDB had no `bind-address`, so under host networking it listened on every interface, and wildcard `cron@'%'` / `root@'%'` accounts existed — meaning anything that could route to the host could log in as `cron`/`1234` and read your leads, agents and call metadata. It now binds to loopback, with loopback-only accounts. **Existing installs must restart, and should run the one-off cleanup in [docs/USAGE.md](docs/USAGE.md#database-exposure).**
-- 🧩 **Roles are selectable per host** — `docker-compose up -d dialer` starts only the dialer, `up -d db web` only those two, and a plain `up -d` still runs everything. Groundwork for splitting the stack across machines.
-- ⚙️ **`VICI_DB` is honoured at runtime** by the dialer and rewrites `VARDB_server`, so VICIdial's cron jobs and the entrypoint agree on which database to use. It was previously ignored.
-- ⚠️ **First-boot behaviour changed:** `web` no longer waits for the database, so a page load during the database's start-up window returns a PHP error rather than nothing listening. It clears once the database is ready.
+- 🌐 **`VICI_DB_BIND` opens the database to remote dialers** — set it to loopback plus one LAN address and restart; it defaults to `127.0.0.1`, identical to a single-host install.
+- 🔑 **`grant-dialer <ip>`** adds a scoped `cron@'<ip>'` account to a *running* database, since the built-in init scripts only ever run once, against an empty volume. Refuses wildcards.
+- 🧷 **`register-node`** creates a second (or later) dialer's full server record before it starts. The first dialer still needs nothing. Refuses to overwrite an existing registration.
+- 📘 **Multi-host install and operation are documented** in [docs/INSTALL.md](docs/INSTALL.md#5a-choose-which-roles-this-host-runs) and [docs/USAGE.md](docs/USAGE.md), including the database-exposure tradeoffs.
+- ⚠️ **Existing installs must rebuild** to get `grant-dialer` and `register-node` — Compose only builds an image that doesn't already exist, so a plain `up -d` silently leaves them missing.
 
 Full release notes and prior versions are in [CHANGELOG.md](CHANGELOG.md).
 
@@ -78,7 +79,7 @@ All three services share one `docker/Dockerfile`: a common `base` stage (Debian 
 ```sh
 git clone https://github.com/ritmguy/vicidial-docker.git
 cd vicidial-docker
-git fetch --tags && git checkout v0.3.0        # deploy from a tag, not main
+git fetch --tags && git checkout v0.4.0        # deploy from a tag, not main
 
 # 1. host: load the DAHDI timer (see docs/INSTALL.md for kernel requirements)
 sudo apt-get install -y dahdi-dkms dahdi linux-headers-$(uname -r)
